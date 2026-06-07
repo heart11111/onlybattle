@@ -75,6 +75,14 @@ export function shouldSuppressMidiTargetConfirmation({
   return Boolean(handledByOnlyBattle && !showMidiTargetConfirmation);
 }
 
+export function shouldClearExistingTargetsForDialog({
+  placedTemplates = [],
+  previousTargets = []
+} = {}) {
+  if (hasValues(placedTemplates)) return false;
+  return !hasValues(previousTargets);
+}
+
 export function createUsageWithMidiSuppression(usage = {}, {
   suppressMidiTargetConfirmation = false,
   suppressMeasuredTemplateCreation = false,
@@ -85,6 +93,9 @@ export function createUsageWithMidiSuppression(usage = {}, {
     ...usage,
     create: {
       ...(usage.create ?? {})
+    },
+    workflowOptions: {
+      ...(usage.workflowOptions ?? {})
     },
     midiOptions: {
       ...(usage.midiOptions ?? {}),
@@ -104,7 +115,15 @@ export function createUsageWithMidiSuppression(usage = {}, {
 
   if (targetUuids.length) {
     const uuids = Array.from(targetUuids);
+    next.targetUuids = uuids;
+    next.workflowOptions.targetUuids = uuids;
     next.midiOptions.targetUuids = uuids;
+    next.midiOptions.workflowOptions.targetUuids = uuids;
+    next.workflowOptions.onlybattle = {
+      ...(next.workflowOptions.onlybattle ?? {}),
+      handledTargeting: true,
+      targetUuids: uuids
+    };
     next.midiOptions.workflowOptions.onlybattle = {
       ...(next.midiOptions.workflowOptions.onlybattle ?? {}),
       handledTargeting: true,

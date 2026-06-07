@@ -8,6 +8,7 @@ import {
 import {
   inferDamageType,
   inferMidiAttackOutcome,
+  workflowDamageSummaries,
   workflowTargets,
   workflowTitle
 } from "./core/workflow-view.mjs";
@@ -15,8 +16,10 @@ import { getIsometricRegistry } from "./settings.mjs";
 import { debug } from "./logger.mjs";
 
 const OUTCOME_CLOSE_DELAYS = {
+  attack: 6500,
   miss: 1400,
-  hit: 4200
+  hit: 4200,
+  critical: 4400
 };
 
 class OnlyBattleCombatOverlay extends foundry.applications.api.HandlebarsApplicationMixin(
@@ -50,7 +53,8 @@ class OnlyBattleCombatOverlay extends foundry.applications.api.HandlebarsApplica
       damageType: "",
       damageEffect: null,
       outcome: "",
-      outcomeBadge: ""
+      outcomeBadge: "",
+      cutins: emptyCutins()
     };
   }
 
@@ -79,7 +83,8 @@ class OverlayManager {
     outcome = "",
     outcomeBadge = "",
     damageType = "",
-    targetTokens = null
+    targetTokens = null,
+    damageSummaries = []
   } = {}) {
     const source = resolveSourceToken(activity?.actor ?? activity?.item?.actor);
     const targets = targetTokens ? Array.from(targetTokens) : Array.from(game.user?.targets ?? []);
@@ -90,7 +95,8 @@ class OverlayManager {
       stage,
       outcome,
       outcomeBadge,
-      damageType
+      damageType,
+      damageSummaries
     });
   }
 
@@ -102,6 +108,7 @@ class OverlayManager {
   } = {}) {
     const source = normalizeToken(workflow?.token) ?? resolveSourceToken(workflow?.actor ?? workflow?.item?.actor);
     const targets = workflowTargets(workflow, stage);
+    const damageSummaries = stage === "damage" ? workflowDamageSummaries(workflow, targets) : [];
     return this.show({
       title: workflowTitle(workflow),
       source,
@@ -109,11 +116,12 @@ class OverlayManager {
       stage,
       outcome,
       outcomeBadge,
-      damageType: damageType || inferDamageType(workflow)
+      damageType: damageType || inferDamageType(workflow),
+      damageSummaries
     });
   }
 
-  async show({ title, source, targets, stage, outcome, outcomeBadge, damageType }) {
+  async show({ title, source, targets, stage, outcome, outcomeBadge, damageType, damageSummaries = [] }) {
     const normalizedSource = normalizeToken(source);
     if (!normalizedSource) {
       debug("Skipping overlay because no source token was found.");
@@ -139,7 +147,8 @@ class OverlayManager {
     const scene = withDamageEffects(buildCombatScene({
       source: normalizedSource,
       targets: sceneTargets,
-      registry: getIsometricRegistry()
+      registry: getIsometricRegistry(),
+      damageSummaries
     }), damageEffect);
 
     await this.app.updateState({
@@ -148,6 +157,7 @@ class OverlayManager {
       stage,
       outcome,
       outcomeBadge: outcomeBadge || getOutcomeBadgeKey(stage),
+      cutins: buildEventCutins(scene, stage),
       damageType,
       damageEffect
     });
@@ -232,6 +242,32 @@ function withDamageEffects(scene, damageEffect) {
       damageEffect: damageEffect && token.role === "target" ? damageEffect : null
     }))
   };
+}
+
+function buildEventCutins(scene, stage) {
+  if (stage === "critical") {
+    return groupCutins([scene?.portraits?.source], "ONLYBATTLE.Overlay.CriticalBang");
+  }
+
+  if (scene?.bloodied?.length) {
+    return groupCutins(scene.bloodied, "ONLYBATTLE.Overlay.BloodiedBang");
+  }
+
+  return emptyCutins();
+}
+
+function groupCutins(portraits = [], label) {
+  const cutins = emptyCutins();
+  for (const portrait of portraits.filter(Boolean)) {
+    const entry = { ...portrait, label };
+    if (portrait.lane === "enemy") cutins.enemies.push(entry);
+    else cutins.allies.push(entry);
+  }
+  return cutins;
+}
+
+function emptyCutins() {
+  return { allies: [], enemies: [] };
 }
 
 function normalizeToken(token) {

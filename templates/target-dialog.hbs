@@ -17,7 +17,11 @@
       <ul>
         {{#each targets}}
           <li>
-            <img src="{{img}}" alt="" />
+            {{#if isVideo}}
+              <video src="{{img}}" aria-label="{{name}}" autoplay loop muted playsinline></video>
+            {{else}}
+              <img src="{{img}}" alt="" />
+            {{/if}}
             <span>{{name}}</span>
           </li>
         {{/each}}

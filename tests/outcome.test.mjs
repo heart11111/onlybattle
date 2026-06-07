@@ -33,7 +33,7 @@ test("uses dnd5e D20Roll success flags when present", () => {
 });
 
 test("critical hits and fumbles override numeric AC comparison", () => {
-  assert.equal(inferAttackOutcome([{ total: 1, isCritical: true }], [tokenWithAc(30)]).stage, "hit");
+  assert.equal(inferAttackOutcome([{ total: 1, isCritical: true }], [tokenWithAc(30)]).stage, "critical");
   assert.equal(inferAttackOutcome([{ total: 30, isFumble: true }], [tokenWithAc(10)]).stage, "miss");
 });
 
@@ -44,6 +44,7 @@ test("extracts target AC from common token actor shapes", () => {
 
 test("maps overlay stages to animated badge localization keys", () => {
   assert.equal(getOutcomeBadgeKey("hit"), "ONLYBATTLE.Overlay.HitBang");
+  assert.equal(getOutcomeBadgeKey("critical"), "ONLYBATTLE.Overlay.CriticalBang");
   assert.equal(getOutcomeBadgeKey("miss"), "ONLYBATTLE.Overlay.MissBang");
   assert.equal(getOutcomeBadgeKey("damage"), "ONLYBATTLE.Overlay.DamageBang");
   assert.equal(getOutcomeBadgeKey("attack"), "");

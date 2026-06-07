@@ -7,6 +7,7 @@ import {
   hasExplicitExternalTargeting,
   isCombatEncounterAvailable,
   needsOnlyBattleTargeting,
+  shouldClearExistingTargetsForDialog,
   shouldSuppressMidiTargetConfirmation,
   validateTargetCount
 } from "../scripts/core/targeting.mjs";
@@ -128,6 +129,17 @@ test("creates a cloned usage config with midi-qol target confirmation disabled",
   assert.equal(next.midiOptions.workflowOptions.targetConfirmation, "never");
 });
 
+test("keeps already selected canvas targets when OnlyBattle opens without a template", () => {
+  assert.equal(shouldClearExistingTargetsForDialog({
+    placedTemplates: [],
+    previousTargets: [{ id: "already-targeted" }]
+  }), false);
+  assert.equal(shouldClearExistingTargetsForDialog({
+    placedTemplates: [],
+    previousTargets: []
+  }), true);
+});
+
 test("can suppress duplicate dnd5e measured template creation after OnlyBattle places one", () => {
   const usage = { create: { chatMessage: true } };
 
@@ -139,7 +151,9 @@ test("can suppress duplicate dnd5e measured template creation after OnlyBattle p
 
   assert.equal(next.create.chatMessage, true);
   assert.equal(next.create.measuredTemplate, false);
+  assert.deepEqual(next.targetUuids, ["Scene.A.Token.1", "Scene.A.Token.2"]);
   assert.deepEqual(next.midiOptions.targetUuids, ["Scene.A.Token.1", "Scene.A.Token.2"]);
+  assert.deepEqual(next.midiOptions.workflowOptions.targetUuids, ["Scene.A.Token.1", "Scene.A.Token.2"]);
   assert.deepEqual(next.onlybattle.templateUuids, ["Scene.A.MeasuredTemplate.1"]);
   assert.deepEqual(next.midiOptions.workflowOptions.onlybattle, {
     handledTargeting: true,

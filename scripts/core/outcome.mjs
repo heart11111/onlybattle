@@ -1,4 +1,8 @@
 const OUTCOME_KEYS = {
+  critical: {
+    outcome: "ONLYBATTLE.Overlay.Critical",
+    outcomeBadge: "ONLYBATTLE.Overlay.CriticalBang"
+  },
   hit: {
     outcome: "ONLYBATTLE.Overlay.Hit",
     outcomeBadge: "ONLYBATTLE.Overlay.HitBang"
@@ -26,7 +30,7 @@ export function inferAttackOutcome(rolls, targets = []) {
   const roll = firstRoll(rolls);
   if (!roll) return null;
 
-  if (roll.isCritical === true) return getOutcomeState("hit");
+  if (roll.isCritical === true) return getOutcomeState("critical");
   if (roll.isFumble === true) return getOutcomeState("miss");
   if (roll.isSuccess === true) return getOutcomeState("hit");
   if (roll.isFailure === true) return getOutcomeState("miss");

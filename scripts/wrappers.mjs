@@ -7,6 +7,7 @@ import {
   hasExplicitExternalTargeting,
   isCombatEncounterAvailable,
   needsOnlyBattleTargeting,
+  shouldClearExistingTargetsForDialog,
   shouldSuppressMidiTargetConfirmation
 } from "./core/targeting.mjs";
 import {
@@ -65,7 +66,7 @@ async function runOnlyBattleTargeting(activity, usage = {}) {
   if (placedTemplates === false) return false;
 
   const targets = await requestOnlyBattleTargets(activity, {
-    clearExisting: !placedTemplates.length,
+    clearExisting: shouldClearExistingTargetsForDialog({ placedTemplates, previousTargets }),
     previousTargets,
     targetPolicy,
     templateMode: placedTemplates.length > 0

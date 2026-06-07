@@ -139,6 +139,79 @@ test("combat overlay derives animated outcome badges from animation stage", asyn
   assert.equal(manager.app.viewState.outcomeBadge, "ONLYBATTLE.Overlay.HitBang");
 });
 
+test("combat overlay separates large event cut-ins from side portraits", async () => {
+  const { getOverlayManager } = await import("../scripts/overlay-manager.mjs");
+  const manager = getOverlayManager();
+  manager.close();
+
+  await manager.show({
+    title: "Rapier",
+    source: token({
+      uuid: "Scene.A.Token.ally",
+      actorUuid: "Actor.ally",
+      x: 100,
+      y: 100,
+      disposition: 1
+    }),
+    targets: [
+      token({
+        uuid: "Scene.A.Token.enemy",
+        actorUuid: "Actor.enemy",
+        x: 300,
+        y: 100,
+        disposition: -1
+      })
+    ],
+    stage: "critical",
+    outcome: "ONLYBATTLE.Overlay.Critical",
+    damageType: ""
+  });
+
+  assert.deepEqual(manager.app.viewState.cutins.enemies, []);
+  assert.deepEqual(manager.app.viewState.cutins.allies.map((portrait) => portrait.id), ["Scene.A.Token.ally"]);
+  assert.deepEqual(manager.app.viewState.scene.portraits.enemies.map((portrait) => portrait.id), ["Scene.A.Token.enemy"]);
+  assert.deepEqual(manager.app.viewState.scene.portraits.allies.map((portrait) => portrait.id), ["Scene.A.Token.ally"]);
+});
+
+test("combat overlay promotes bloodied targets into large event cut-ins", async () => {
+  const { getOverlayManager } = await import("../scripts/overlay-manager.mjs");
+  const manager = getOverlayManager();
+  manager.close();
+
+  await manager.show({
+    title: "Rapier",
+    source: token({
+      uuid: "Scene.A.Token.ally",
+      actorUuid: "Actor.ally",
+      x: 100,
+      y: 100,
+      disposition: 1
+    }),
+    targets: [
+      token({
+        uuid: "Scene.A.Token.enemy",
+        actorUuid: "Actor.enemy",
+        x: 300,
+        y: 100,
+        disposition: -1
+      })
+    ],
+    stage: "damage",
+    outcome: "ONLYBATTLE.Overlay.Damage",
+    damageSummaries: [{
+      tokenUuid: "Scene.A.Token.enemy",
+      actorUuid: "Actor.enemy",
+      damageText: "-12",
+      hpText: "8 HP",
+      bloodied: true
+    }]
+  });
+
+  assert.deepEqual(manager.app.viewState.cutins.allies, []);
+  assert.deepEqual(manager.app.viewState.cutins.enemies.map((portrait) => portrait.id), ["Scene.A.Token.enemy"]);
+  assert.equal(manager.app.viewState.cutins.enemies[0].label, "ONLYBATTLE.Overlay.BloodiedBang");
+});
+
 test("combat overlay filters the source token out of target portraits", async () => {
   const { getOverlayManager } = await import("../scripts/overlay-manager.mjs");
   const manager = getOverlayManager();
@@ -214,6 +287,50 @@ test("combat overlay schedules outcome stages to close when damage never follows
   }
 
   assert.deepEqual(scheduledDelays, [1400]);
+});
+
+test("combat overlay schedules attack stages to close when the roll is cancelled", async () => {
+  const { getOverlayManager } = await import("../scripts/overlay-manager.mjs");
+  const manager = getOverlayManager();
+  manager.close();
+
+  const oldSetTimeout = globalThis.setTimeout;
+  const oldClearTimeout = globalThis.clearTimeout;
+  const scheduledDelays = [];
+  globalThis.setTimeout = (_callback, delay) => {
+    scheduledDelays.push(delay);
+    return { delay };
+  };
+  globalThis.clearTimeout = () => {};
+
+  try {
+    await manager.show({
+      title: "Longsword",
+      source: token({
+        uuid: "Scene.A.Token.source",
+        actorUuid: "Actor.source",
+        x: 100,
+        y: 100
+      }),
+      targets: [
+        token({
+          uuid: "Scene.A.Token.target",
+          actorUuid: "Actor.target",
+          x: 300,
+          y: 100
+        })
+      ],
+      stage: "attack",
+      outcome: "",
+      damageType: ""
+    });
+  } finally {
+    manager.close();
+    globalThis.setTimeout = oldSetTimeout;
+    globalThis.clearTimeout = oldClearTimeout;
+  }
+
+  assert.deepEqual(scheduledDelays, [6500]);
 });
 
 test("combat overlay attaches temporary damage effects only to target tokens", async () => {
@@ -294,14 +411,15 @@ test("damage workflow overlay falls back from empty hitTargets to actual workflo
   );
 });
 
-function token({ uuid, actorUuid, x, y }) {
+function token({ uuid, actorUuid, x, y, disposition = 0 }) {
   return {
     id: uuid.split(".").at(-1),
     name: uuid,
     center: { x, y },
     document: {
       uuid,
-      texture: { src: "tokens/default.webp" }
+      texture: { src: "tokens/default.webp" },
+      disposition
     },
     actor: {
       uuid: actorUuid,

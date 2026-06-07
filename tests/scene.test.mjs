@@ -6,11 +6,12 @@ import {
   getIsoImageForToken,
   getPortraitForToken,
   getTokenGridCenter,
+  isVideoMediaPath,
   measureTokenDistance,
   projectCanvasToIso
 } from "../scripts/core/scene.mjs";
 
-function token({ uuid, actorUuid, x, y, img = "tokens/default.webp", documentX, documentY, width = 1, height = 1 }) {
+function token({ uuid, actorUuid, x, y, img = "tokens/default.webp", documentX, documentY, width = 1, height = 1, disposition = 0, elevation = 0 }) {
   return {
     id: uuid.split(".").at(-1),
     name: uuid,
@@ -21,7 +22,9 @@ function token({ uuid, actorUuid, x, y, img = "tokens/default.webp", documentX, 
       x: documentX,
       y: documentY,
       width,
-      height
+      height,
+      disposition,
+      elevation
     },
     actor: {
       uuid: actorUuid,
@@ -125,6 +128,104 @@ test("builds a centered combat scene from attacker and targets", () => {
   assert.equal(scene.bounds.height >= 0, true);
 });
 
+test("marks webm isometric token art as looping video media", () => {
+  const source = token({
+    uuid: "Scene.A.Token.source",
+    actorUuid: "Actor.source",
+    x: 100,
+    y: 100
+  });
+
+  const scene = buildCombatScene({
+    source,
+    registry: {
+      "Actor.source": "onlybattle/tokens/source.webm"
+    }
+  });
+
+  assert.equal(isVideoMediaPath("onlybattle/tokens/source.webm?cache=1"), true);
+  assert.equal(isVideoMediaPath("onlybattle/tokens/source.webp"), false);
+  assert.equal(scene.tokens[0].isVideo, true);
+  assert.equal(scene.tokens[0].mediaType, "video");
+});
+
+test("marks normal Foundry token webm fallback as looping video media", () => {
+  const source = token({
+    uuid: "Scene.A.Token.source",
+    actorUuid: "Actor.source",
+    x: 100,
+    y: 100,
+    img: "tokens/source.webm"
+  });
+
+  const scene = buildCombatScene({ source });
+
+  assert.equal(scene.tokens[0].img, "tokens/source.webm");
+  assert.equal(scene.tokens[0].artMode, "token");
+  assert.equal(scene.tokens[0].isVideo, true);
+  assert.equal(scene.tokens[0].mediaType, "video");
+});
+
+test("groups cut-in portraits by token disposition instead of roller role", () => {
+  const hostileSource = token({
+    uuid: "Scene.A.Token.enemy",
+    actorUuid: "Actor.enemy",
+    x: 100,
+    y: 100,
+    disposition: -1
+  });
+  const friendlyTarget = token({
+    uuid: "Scene.A.Token.ally",
+    actorUuid: "Actor.ally",
+    x: 300,
+    y: 100,
+    disposition: 1
+  });
+
+  const scene = buildCombatScene({
+    source: hostileSource,
+    targets: [friendlyTarget]
+  });
+
+  assert.deepEqual(scene.portraits.enemies.map((portrait) => portrait.id), ["Scene.A.Token.enemy"]);
+  assert.deepEqual(scene.portraits.allies.map((portrait) => portrait.id), ["Scene.A.Token.ally"]);
+});
+
+test("adds damage and bloodied annotations to matching scene portraits", () => {
+  const source = token({
+    uuid: "Scene.A.Token.source",
+    actorUuid: "Actor.source",
+    x: 100,
+    y: 100,
+    disposition: 1
+  });
+  const target = token({
+    uuid: "Scene.A.Token.target",
+    actorUuid: "Actor.target",
+    x: 300,
+    y: 100,
+    disposition: -1
+  });
+
+  const scene = buildCombatScene({
+    source,
+    targets: [target],
+    damageSummaries: [{
+      tokenUuid: "Scene.A.Token.target",
+      actorUuid: "Actor.target",
+      damageText: "-8",
+      hpText: "12 HP",
+      bloodied: true
+    }]
+  });
+  const targetPortrait = scene.portraits.enemies[0];
+
+  assert.equal(targetPortrait.damageText, "-8");
+  assert.equal(targetPortrait.hpText, "12 HP");
+  assert.equal(targetPortrait.bloodied, true);
+  assert.equal(scene.bloodied.length, 1);
+});
+
 test("projects large tokens from the center of their occupied grid footprint", () => {
   const source = token({
     uuid: "Scene.A.Token.source",
@@ -185,6 +286,120 @@ test("centers token anchors inside isometric cells instead of on grid lines", ()
   }
 });
 
+test("keeps token anchors centered when the canvas grid size is not 100px", () => {
+  const source = token({
+    uuid: "Scene.A.Token.source",
+    actorUuid: "Actor.source",
+    x: 999,
+    y: 999,
+    documentX: 0,
+    documentY: 0
+  });
+  const target = token({
+    uuid: "Scene.A.Token.target",
+    actorUuid: "Actor.target",
+    x: 999,
+    y: 999,
+    documentX: 50,
+    documentY: 0
+  });
+
+  const scene = buildCombatScene({
+    source,
+    targets: [target],
+    grid: { gridSize: 50, gridDistance: 5 }
+  });
+
+  assert.equal(scene.grid.stepX, 25);
+  for (const sceneToken of scene.tokens) {
+    const nearestLineDistance = Math.min(
+      ...scene.grid.lines.map((line) => pointLineDistance(sceneToken, line))
+    );
+    assert.equal(nearestLineDistance > 5, true);
+  }
+});
+
+test("colors every occupied floor cell by ally and enemy disposition", () => {
+  const source = token({
+    uuid: "Scene.A.Token.source",
+    actorUuid: "Actor.source",
+    x: 999,
+    y: 999,
+    documentX: 0,
+    documentY: 0,
+    disposition: 1
+  });
+  const largeTarget = token({
+    uuid: "Scene.A.Token.large",
+    actorUuid: "Actor.large",
+    x: 999,
+    y: 999,
+    documentX: 100,
+    documentY: 0,
+    width: 2,
+    height: 2,
+    disposition: -1
+  });
+
+  const scene = buildCombatScene({
+    source,
+    targets: [largeTarget],
+    grid: { gridSize: 100, gridDistance: 5 }
+  });
+
+  assert.equal(scene.floorCells.filter((cell) => cell.lane === "ally").length, 1);
+  assert.equal(scene.floorCells.filter((cell) => cell.lane === "enemy").length, 4);
+  assert.equal(scene.floorCells.every((cell) => cell.points.split(" ").length === 4), true);
+});
+
+test("centers normal token anchors on their occupied floor cell", () => {
+  const source = token({
+    uuid: "Scene.A.Token.source",
+    actorUuid: "Actor.source",
+    x: 999,
+    y: 999,
+    documentX: 0,
+    documentY: 0
+  });
+
+  const scene = buildCombatScene({
+    source,
+    grid: { gridSize: 100, gridDistance: 5 }
+  });
+  const sceneToken = scene.tokens[0];
+  const floorCell = scene.floorCells[0];
+
+  assert.equal(sceneToken.x, sceneToken.floorX);
+  assert.equal(sceneToken.y, sceneToken.floorY);
+  assert.deepEqual(diamondCenter(floorCell.points), {
+    x: sceneToken.floorX,
+    y: sceneToken.floorY
+  });
+});
+
+test("raises flying tokens and connects them back to their occupied floor", () => {
+  const source = token({
+    uuid: "Scene.A.Token.source",
+    actorUuid: "Actor.source",
+    x: 999,
+    y: 999,
+    documentX: 0,
+    documentY: 0,
+    elevation: 30
+  });
+
+  const scene = buildCombatScene({
+    source,
+    grid: { gridSize: 100, gridDistance: 5 }
+  });
+  const sceneToken = scene.tokens[0];
+
+  assert.equal(sceneToken.elevation, 30);
+  assert.equal(sceneToken.y < sceneToken.floorY, true);
+  assert.equal(scene.flightLines.length, 1);
+  assert.equal(scene.flightLines[0].tokenId, "Scene.A.Token.source");
+});
+
 test("uses actor portrait art separately from isometric token art", () => {
   const source = token({
     uuid: "Scene.A.Token.source",
@@ -205,6 +420,36 @@ function pointLineDistance(point, line) {
   );
   const denominator = Math.hypot(line.x2 - line.x1, line.y2 - line.y1);
   return denominator > 0 ? numerator / denominator : Infinity;
+}
+
+function diamondCenter(points) {
+  const parsed = points.split(" ").map((pair) => {
+    const [x, y] = pair.split(",").map(Number);
+    return { x, y };
+  });
+  return {
+    x: (parsed[1].x + parsed[3].x) / 2,
+    y: (parsed[0].y + parsed[2].y) / 2
+  };
+}
+
+function parsePolygon(points) {
+  return points.split(" ").map((pair) => {
+    const [x, y] = pair.split(",").map(Number);
+    return { x, y };
+  });
+}
+
+function pointInPolygon(point, polygon) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const a = polygon[i];
+    const b = polygon[j];
+    const intersects = ((a.y > point.y) !== (b.y > point.y))
+      && (point.x < ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x);
+    if (intersects) inside = !inside;
+  }
+  return inside || polygon.some((vertex) => Math.abs(vertex.x - point.x) <= 1 && Math.abs(vertex.y - point.y) <= 1);
 }
 
 test("measures combat distance with a lightweight grid calculation", () => {
@@ -245,11 +490,15 @@ test("scales distant encounters so token art stays inside the isometric scene", 
   });
 
   assert.equal(scene.tokens.every((entry) => entry.scale < 1), true);
-  assert.equal(scene.tokens.every((entry) => entry.scale >= 0.45), true);
+  assert.equal(scene.tokens.every((entry) => entry.scale >= 0.28), true);
   assert.equal(scene.tokens.every((entry) => entry.visualBounds.left >= 0), true);
   assert.equal(scene.tokens.every((entry) => entry.visualBounds.right <= scene.size.width), true);
   assert.equal(scene.tokens.every((entry) => entry.visualBounds.top >= 0), true);
   assert.equal(scene.tokens.every((entry) => entry.visualBounds.bottom <= scene.size.height), true);
+  assert.equal(scene.tokens.every((entry) => pointInPolygon(
+    { x: entry.floorX, y: entry.floorY },
+    parsePolygon(scene.grid.clipPoints)
+  )), true);
 });
 
 test("keeps gargantuan token footprints inside the isometric scene", () => {

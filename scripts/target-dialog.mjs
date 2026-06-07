@@ -3,6 +3,7 @@ import {
   activateCanvasTargetTool,
   restoreCanvasToolState
 } from "./core/canvas-controls.mjs";
+import { isVideoMediaPath } from "./core/scene.mjs";
 import { getActivityTargetPolicy, validateTargetCount } from "./core/targeting.mjs";
 
 export async function requestOnlyBattleTargets(activity, options = {}) {
@@ -53,11 +54,16 @@ class OnlyBattleTargetDialog extends foundry.applications.api.HandlebarsApplicat
   }
 
   async _prepareContext(options) {
-    const targets = Array.from(game.user?.targets ?? []).map((token) => ({
-      id: token.id,
-      name: token.name,
-      img: token.document?.texture?.src ?? token.document?.img ?? token.actor?.img ?? "icons/svg/mystery-man.svg"
-    }));
+    const targets = Array.from(game.user?.targets ?? []).map((token) => {
+      const img = token.document?.texture?.src ?? token.document?.img ?? token.actor?.img ?? "icons/svg/mystery-man.svg";
+      return {
+        id: token.id,
+        name: token.name,
+        img,
+        isVideo: isVideoMediaPath(img),
+        mediaType: isVideoMediaPath(img) ? "video" : "image"
+      };
+    });
 
     return {
       ...(await super._prepareContext(options)),
