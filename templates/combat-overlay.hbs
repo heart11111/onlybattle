@@ -1,0 +1,73 @@
+<section class="onlybattle-overlay-shell onlybattle-stage-{{stage}}">
+  <div class="onlybattle-overlay-title">
+    <strong>{{title}}</strong>
+    {{#if outcome}}<span>{{localize outcome}}</span>{{/if}}
+    {{#if damageType}}<em>{{damageType}}</em>{{/if}}
+  </div>
+
+  <div class="onlybattle-combat-frame">
+    {{#if scene.portraits.source}}
+      <aside class="onlybattle-combat-portrait onlybattle-combat-portrait-source">
+        <img src="{{scene.portraits.source.img}}" alt="{{scene.portraits.source.name}}" />
+        <strong>{{scene.portraits.source.name}}</strong>
+      </aside>
+    {{/if}}
+
+    <div
+      class="onlybattle-iso-scene"
+      style="width: {{scene.size.width}}px; height: {{scene.size.height}}px;"
+    >
+      <svg
+        class="onlybattle-iso-grid"
+        viewBox="0 0 {{scene.size.width}} {{scene.size.height}}"
+        aria-hidden="true"
+      >
+        <defs>
+          <clipPath id="onlybattle-grid-clip">
+            <polygon points="{{scene.grid.clipPoints}}"></polygon>
+          </clipPath>
+        </defs>
+        <polygon class="onlybattle-iso-plane" points="{{scene.grid.clipPoints}}"></polygon>
+        <g clip-path="url(#onlybattle-grid-clip)">
+          {{#each scene.grid.lines}}
+            <line x1="{{x1}}" y1="{{y1}}" x2="{{x2}}" y2="{{y2}}"></line>
+          {{/each}}
+        </g>
+      </svg>
+
+      {{#each scene.tokens}}
+        <div
+          class="onlybattle-iso-token onlybattle-role-{{role}} onlybattle-art-{{artMode}}"
+          style="left: {{x}}px; top: {{y}}px; --onlybattle-token-scale: {{scale}}; --onlybattle-token-size-scale: {{sizeScale}};"
+          data-token-id="{{id}}"
+        >
+          <img src="{{img}}" alt="{{name}}" />
+          {{#if damageEffect}}
+            <div class="onlybattle-damage-effect onlybattle-damage-effect-{{damageEffect.key}}" aria-hidden="true"></div>
+          {{/if}}
+          <span>{{name}}</span>
+        </div>
+      {{/each}}
+      {{#if outcomeBadge}}
+        <div class="onlybattle-outcome-badge onlybattle-outcome-{{stage}}">
+          {{localize outcomeBadge}}
+        </div>
+      {{/if}}
+      <div class="onlybattle-hit-flash"></div>
+    </div>
+
+    {{#if scene.portraits.targets}}
+      <aside class="onlybattle-combat-portrait-stack">
+        {{#each scene.portraits.targets}}
+          <div class="onlybattle-combat-portrait onlybattle-combat-portrait-target">
+            <img src="{{img}}" alt="{{name}}" />
+            <strong>{{name}}</strong>
+            {{#if distance.value}}
+              <span>{{distance.value}} {{distance.units}}</span>
+            {{/if}}
+          </div>
+        {{/each}}
+      </aside>
+    {{/if}}
+  </div>
+</section>

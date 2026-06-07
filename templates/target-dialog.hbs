@@ -1,0 +1,44 @@
+<section class="onlybattle-target-body">
+  <p class="onlybattle-target-instruction">
+    {{localize "ONLYBATTLE.TargetDialog.Instruction" item=itemName activity=activityName}}
+  </p>
+  {{#if targetHint}}
+    <p class="onlybattle-target-hint">{{targetHint}}</p>
+  {{/if}}
+
+  <div class="onlybattle-target-list">
+    <h3>
+      {{localize "ONLYBATTLE.TargetDialog.SelectedTargets"}}
+      {{#if maxTargets}}
+        <small>{{localize "ONLYBATTLE.TargetDialog.MaxTargets" count=maxTargets}}</small>
+      {{/if}}
+    </h3>
+    {{#if hasTargets}}
+      <ul>
+        {{#each targets}}
+          <li>
+            <img src="{{img}}" alt="" />
+            <span>{{name}}</span>
+          </li>
+        {{/each}}
+      </ul>
+    {{else}}
+      <p class="notes">{{localize "ONLYBATTLE.TargetDialog.Empty"}}</p>
+    {{/if}}
+  </div>
+
+  <footer class="onlybattle-actions">
+    <button type="button" data-action="clear">
+      <i class="fa-solid fa-broom"></i>
+      {{localize "ONLYBATTLE.TargetDialog.Clear"}}
+    </button>
+    <button type="button" data-action="cancel">
+      <i class="fa-solid fa-xmark"></i>
+      {{localize "Cancel"}}
+    </button>
+    <button type="button" data-action="confirm" class="default">
+      <i class="fa-solid fa-check"></i>
+      {{localize "ONLYBATTLE.TargetDialog.Confirm"}}
+    </button>
+  </footer>
+</section>
