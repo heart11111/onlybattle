@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OnlyBattle Visual Grid Harness</title>
+  <style>
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background: #14171d;
+      color: #f4f0e8;
+      font-family: Arial, sans-serif;
+    }
+
+    main {
+      display: grid;
+      gap: 20px;
+      padding: 24px;
+    }
+
+    .case {
+      width: 860px;
+      border: 1px solid #526071;
+      background: #191d24;
+      box-shadow: 0 20px 60px rgb(0 0 0 / 35%);
+    }
+
+    .case h2 {
+      margin: 0;
+      padding: 10px 14px;
+      background: #222833;
+      font-size: 15px;
+    }
+
+    svg {
+      display: block;
+      width: 860px;
+      height: 430px;
+      background: radial-gradient(circle at 50% 46%, #2d3441 0, #161a20 70%);
+    }
+
+    .plane {
+      fill: #987846;
+      stroke: #d8b776;
+      stroke-width: 1.5;
+      opacity: 0.92;
+    }
+
+    .grid-cell {
+      fill: none;
+      stroke: rgb(28 30 35 / 65%);
+      stroke-width: 1;
+    }
+
+    .floor-source {
+      fill: rgb(46 201 115 / 32%);
+      stroke: #33d27a;
+      stroke-width: 2;
+    }
+
+    .floor-target {
+      fill: rgb(245 73 73 / 36%);
+      stroke: #ff706d;
+      stroke-width: 2;
+    }
+
+    .anchor {
+      fill: #ffffff;
+      stroke: #111;
+      stroke-width: 2;
+    }
+
+    .label {
+      fill: #fff;
+      paint-order: stroke;
+      stroke: #111;
+      stroke-width: 4;
+      font-size: 13px;
+      font-weight: 700;
+      text-anchor: middle;
+    }
+  </style>
+</head>
+<body>
+  <main id="cases"></main>
+  <script type="module">
+    import { buildCombatScene } from "../scripts/core/scene.mjs";
+
+    function token({ uuid, actorUuid, name, documentX, documentY, width = 1, height = 1, disposition = 0 }) {
+      return {
+        id: uuid.split(".").at(-1),
+        name,
+        document: {
+          uuid,
+          x: documentX,
+          y: documentY,
+          width,
+          height,
+          disposition,
+          texture: { src: "icons/svg/mystery-man.svg" }
+        },
+        actor: {
+          uuid: actorUuid,
+          img: "icons/svg/mystery-man.svg"
+        }
+      };
+    }
+
+    const cases = [
+      {
+        name: "close grid 100",
+        grid: { gridSize: 100, gridDistance: 5 },
+        source: token({
+          uuid: "Scene.Visual.Token.source",
+          actorUuid: "Actor.source",
+          name: "Source",
+          documentX: 0,
+          documentY: 0,
+          disposition: 1
+        }),
+        targets: [token({
+          uuid: "Scene.Visual.Token.target",
+          actorUuid: "Actor.target",
+          name: "Target",
+          documentX: 100,
+          documentY: 0,
+          disposition: -1
+        })]
+      },
+      {
+        name: "distant auto-scale",
+        grid: { gridSize: 100, gridDistance: 5 },
+        source: token({
+          uuid: "Scene.Visual.Token.source",
+          actorUuid: "Actor.source",
+          name: "Source",
+          documentX: 0,
+          documentY: 0,
+          disposition: 1
+        }),
+        targets: [token({
+          uuid: "Scene.Visual.Token.target",
+          actorUuid: "Actor.target",
+          name: "Target",
+          documentX: 900,
+          documentY: 600,
+          disposition: -1
+        })]
+      },
+      {
+        name: "large target grid 72",
+        grid: { gridSize: 72, gridDistance: 5 },
+        source: token({
+          uuid: "Scene.Visual.Token.source",
+          actorUuid: "Actor.source",
+          name: "Source",
+          documentX: 0,
+          documentY: 0,
+          disposition: 1
+        }),
+        targets: [token({
+          uuid: "Scene.Visual.Token.large",
+          actorUuid: "Actor.large",
+          name: "Large",
+          documentX: 216,
+          documentY: 72,
+          width: 2,
+          height: 2,
+          disposition: -1
+        })]
+      }
+    ];
+
+    function polygonElement(points, className) {
+      const element = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+      element.setAttribute("class", className);
+      element.setAttribute("points", points);
+      return element;
+    }
+
+    function circleElement(token) {
+      const element = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      element.setAttribute("class", "anchor");
+      element.setAttribute("cx", token.anchor.x);
+      element.setAttribute("cy", token.anchor.y);
+      element.setAttribute("r", 6);
+      return element;
+    }
+
+    function labelElement(token) {
+      const element = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      element.setAttribute("class", "label");
+      element.setAttribute("x", token.anchor.x);
+      element.setAttribute("y", token.anchor.y + 22);
+      element.textContent = token.name;
+      return element;
+    }
+
+    function renderCase(definition) {
+      const scene = buildCombatScene(definition);
+      const section = document.createElement("section");
+      section.className = "case";
+      section.dataset.case = definition.name;
+      section.innerHTML = `<h2>${definition.name} - zoom ${scene.zoom}</h2>`;
+
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("viewBox", `0 0 ${scene.size.width} ${scene.size.height}`);
+      svg.appendChild(polygonElement(scene.grid.clipPoints, "plane"));
+      for (const cell of scene.floorCells) {
+        svg.appendChild(polygonElement(cell.points, `floor-${cell.role}`));
+      }
+      for (const cell of scene.grid.cells) svg.appendChild(polygonElement(cell.points, "grid-cell"));
+      for (const sceneToken of scene.tokens) {
+        svg.appendChild(circleElement(sceneToken));
+        svg.appendChild(labelElement(sceneToken));
+      }
+
+      section.appendChild(svg);
+      return { scene, section };
+    }
+
+    const root = document.querySelector("#cases");
+    const rendered = cases.map(renderCase);
+    for (const entry of rendered) root.appendChild(entry.section);
+    window.__onlybattleVisualScenes = rendered.map((entry, index) => ({
+      name: cases[index].name,
+      scene: entry.scene
+    }));
+  </script>
+</body>
+</html>

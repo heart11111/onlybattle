@@ -1,0 +1,36 @@
+<section class="onlybattle-registry-body">
+  <p class="notes">{{localize "ONLYBATTLE.Registry.Help"}}</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>{{localize "ONLYBATTLE.Registry.UUID"}}</th>
+        <th>{{localize "ONLYBATTLE.Registry.ImagePath"}}</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody data-registry-rows>
+      {{#each entries}}
+        <tr data-registry-row>
+          <td><input type="text" name="uuid" value="{{uuid}}" /></td>
+          <td class="onlybattle-registry-path">
+            <input type="text" name="path" value="{{path}}" />
+            <button type="button" data-action="browse"><i class="fa-solid fa-folder-open"></i></button>
+          </td>
+          <td><button type="button" data-action="remove"><i class="fa-solid fa-trash"></i></button></td>
+        </tr>
+      {{/each}}
+    </tbody>
+  </table>
+
+  <footer class="onlybattle-actions">
+    <button type="button" data-action="add">
+      <i class="fa-solid fa-plus"></i>
+      {{localize "ONLYBATTLE.Registry.Add"}}
+    </button>
+    <button type="button" data-action="save" class="default">
+      <i class="fa-solid fa-save"></i>
+      {{localize "Save"}}
+    </button>
+  </footer>
+</section>
