@@ -5,7 +5,7 @@ import {
   buildIsoAnimationRequest,
   classifyAutoAnimationsWorkflow,
   shouldRouteAutoAnimationsWorkflowToIso
-} from "../scripts/animation-router.mjs";
+} from "../../scripts/compat/autoanimations-bridge.mjs";
 
 test("routes AutoAnimations melee and ranged workflows to the isometric overlay", () => {
   assert.equal(shouldRouteAutoAnimationsWorkflowToIso(workflow({ menu: "melee" })), true);
@@ -191,7 +191,7 @@ test("does not stop the original AutoAnimations workflow when raw database entri
   };
 
   try {
-    const { registerAutoAnimationsBridge } = await import(`../scripts/animation-router.mjs?unresolved=${Date.now()}`);
+    const { registerAutoAnimationsBridge } = await import(`../../scripts/compat/autoanimations-bridge.mjs?unresolved=${Date.now()}`);
     const shown = [];
     registerAutoAnimationsBridge({
       showIsoAnimation: (request) => shown.push(request)
@@ -243,7 +243,7 @@ test("AutoAnimations bridge stops only routeable workflows and leaves persistent
     }
   };
 
-  const { registerAutoAnimationsBridge } = await import(`../scripts/animation-router.mjs?bridge=${Date.now()}`);
+  const { registerAutoAnimationsBridge } = await import(`../../scripts/compat/autoanimations-bridge.mjs?bridge=${Date.now()}`);
   const shown = [];
   registerAutoAnimationsBridge({
     showIsoAnimation: (request) => shown.push(request)

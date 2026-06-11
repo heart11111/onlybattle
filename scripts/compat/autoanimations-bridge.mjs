@@ -1,5 +1,5 @@
-import { MODULE_ID, SETTINGS } from "./constants.mjs";
-import { debug } from "./logger.mjs";
+import { MODULE_ID, SETTINGS } from "../constants.mjs";
+import { debug } from "../logger.mjs";
 
 const CANVAS_ONLY_MENUS = new Set(["aura", "aefx"]);
 const PERSISTENT_TEMPLATE_TYPES = new Set(["attachtemplate", "groundtile", "overheadtile"]);
