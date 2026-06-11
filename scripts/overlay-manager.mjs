@@ -56,7 +56,8 @@ class OnlyBattleCombatOverlay extends foundry.applications.api.HandlebarsApplica
       outcome: "",
       outcomeBadge: "",
       cutins: emptyCutins(),
-      cinematicCutin: null
+      cinematicCutin: null,
+      isoEffects: []
     };
   }
 
@@ -166,6 +167,7 @@ class OverlayManager {
       outcomeBadge: outcomeBadge || getOutcomeBadgeKey(stage),
       cutins,
       cinematicCutin,
+      isoEffects: [],
       damageType,
       damageEffect
     });
@@ -180,6 +182,51 @@ class OverlayManager {
       damageSummaries
     });
     this.autoCloseOutcomeStage(stage);
+  }
+
+  async showIsoAnimation({ title, source, targets, effects = [] }) {
+    const normalizedSource = normalizeToken(source);
+    if (!normalizedSource) {
+      debug("Skipping isometric animation because no source token was found.");
+      return;
+    }
+
+    clearTimeout(this.closeTimer);
+    this.app ??= new OnlyBattleCombatOverlay();
+
+    const normalizedTargets = uniqueTargets(
+      Array.from(targets ?? []).map(normalizeToken).filter(Boolean),
+      normalizedSource
+    );
+    const scene = buildCombatScene({
+      source: normalizedSource,
+      targets: normalizedTargets,
+      registry: getIsometricRegistry()
+    });
+    const isoEffects = mapIsoEffectsToScene(effects, scene);
+    const sceneWithEffects = {
+      ...scene,
+      isoEffects
+    };
+
+    this.lastParticipants = {
+      source: normalizedSource,
+      targets: normalizedTargets
+    };
+
+    await this.app.updateState({
+      title,
+      scene: sceneWithEffects,
+      stage: "animation",
+      outcome: "",
+      outcomeBadge: "",
+      cutins: emptyCutins(),
+      cinematicCutin: null,
+      isoEffects,
+      damageType: "",
+      damageEffect: null
+    });
+    this.autoClose(3200);
   }
 
   autoClose(delay = 1800) {
@@ -282,11 +329,48 @@ function resolveSourceToken(actor) {
 function withDamageEffects(scene, damageEffect) {
   return {
     ...scene,
+    isoEffects: [],
     tokens: scene.tokens.map((token) => ({
       ...token,
       damageEffect: damageEffect && token.role === "target" ? damageEffect : null
     }))
   };
+}
+
+function mapIsoEffectsToScene(effects = [], scene) {
+  return effects.flatMap((effect) => {
+    const source = findSceneToken(scene, effect.sourceId);
+    const target = findSceneToken(scene, effect.targetId) ?? source;
+    if (!source || !target || !effect.file) return [];
+
+    return [{
+      kind: effect.kind,
+      file: effect.file,
+      mediaType: isVideoMediaPath(effect.file) ? "video" : "image",
+      isVideo: isVideoMediaPath(effect.file),
+      sourceId: effect.sourceId,
+      targetId: effect.targetId,
+      source: source.anchor,
+      target: target.anchor,
+      x: source.anchor.x,
+      y: source.anchor.y,
+      dx: target.anchor.x - source.anchor.x,
+      dy: target.anchor.y - source.anchor.y,
+      repeat: effect.repeat ?? 1,
+      repeatDelay: effect.repeatDelay ?? 250,
+      playbackRate: effect.playbackRate ?? 1,
+      label: effect.label ?? "",
+      color: effect.color ?? ""
+    }];
+  });
+}
+
+function findSceneToken(scene, id) {
+  if (!id) return null;
+  return scene.tokens.find((token) => token.id === id
+    || token.name === id
+    || token.id?.split?.(".").at(-1) === id
+    || token.name?.split?.(".").at(-1) === id);
 }
 
 function buildEventCutins(scene, stage) {

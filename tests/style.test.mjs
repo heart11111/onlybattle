@@ -123,3 +123,17 @@ test("combat overlay positions tokens from scene-space anchors", () => {
   assert.doesNotMatch(template, /left:\s*{{x}}px;/);
   assert.doesNotMatch(template, /top:\s*{{y}}px;/);
 });
+
+test("combat overlay renders an isometric animation effect layer", () => {
+  const css = fs.readFileSync("styles/onlybattle.css", "utf8");
+  const template = fs.readFileSync("templates/combat-overlay.hbs", "utf8");
+  const layerRule = css.match(/\.onlybattle-iso-effects\s*\{(?<body>[^}]+)\}/)?.groups?.body ?? "";
+  const projectileRule = css.match(/\.onlybattle-iso-effect-projectile\s*\{(?<body>[^}]+)\}/)?.groups?.body ?? "";
+
+  assert.match(template, /scene\.isoEffects/);
+  assert.match(template, /onlybattle-iso-effect-\{\{kind\}\}/);
+  assert.match(template, /<video src="{{file}}"[^>]*autoplay muted playsinline>/);
+  assert.match(layerRule, /pointer-events:\s*none;/);
+  assert.match(layerRule, /position:\s*absolute;/);
+  assert.match(projectileRule, /offset-path:/);
+});

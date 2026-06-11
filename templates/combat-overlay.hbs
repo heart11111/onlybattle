@@ -133,6 +133,26 @@
           <span>{{name}}</span>
         </div>
       {{/each}}
+      {{#if scene.isoEffects}}
+        <div class="onlybattle-iso-effects" aria-hidden="true">
+          {{#each scene.isoEffects}}
+            <div
+              class="onlybattle-iso-effect onlybattle-iso-effect-{{kind}}"
+              style="left: {{source.x}}px; top: {{source.y}}px; --onlybattle-effect-dx: {{dx}}px; --onlybattle-effect-dy: {{dy}}px; --onlybattle-playback-rate: {{playbackRate}};"
+              data-source-id="{{sourceId}}"
+              data-target-id="{{targetId}}"
+              data-label="{{label}}"
+              data-color="{{color}}"
+            >
+              {{#if isVideo}}
+                <video src="{{file}}" autoplay muted playsinline></video>
+              {{else}}
+                <img src="{{file}}" alt="" />
+              {{/if}}
+            </div>
+          {{/each}}
+        </div>
+      {{/if}}
       {{#if outcomeBadge}}
         <div class="onlybattle-outcome-badge onlybattle-outcome-{{stage}}">
           {{localize outcomeBadge}}

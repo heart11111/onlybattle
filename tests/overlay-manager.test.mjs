@@ -527,6 +527,62 @@ test("combat overlay attaches temporary damage effects only to target tokens", a
   });
 });
 
+test("combat overlay maps isometric animation effects onto scene token anchors", async () => {
+  const { getOverlayManager } = await import("../scripts/overlay-manager.mjs");
+  const manager = getOverlayManager();
+  manager.close();
+
+  await manager.showIsoAnimation({
+    title: "Fire Bolt",
+    source: token({
+      uuid: "Scene.A.Token.source",
+      actorUuid: "Actor.source",
+      x: 100,
+      y: 100
+    }),
+    targets: [
+      token({
+        uuid: "Scene.A.Token.target",
+        actorUuid: "Actor.target",
+        x: 300,
+        y: 100
+      })
+    ],
+    effects: [{
+      kind: "projectile",
+      file: "modules/jb2a/firebolt.webm",
+      sourceId: "source",
+      targetId: "target",
+      repeat: 1,
+      repeatDelay: 250,
+      playbackRate: 1,
+      label: "firebolt",
+      color: "orange"
+    }]
+  });
+
+  assert.equal(manager.app.viewState.stage, "animation");
+  assert.deepEqual(manager.app.viewState.isoEffects, [{
+    kind: "projectile",
+    file: "modules/jb2a/firebolt.webm",
+    mediaType: "video",
+    isVideo: true,
+    sourceId: "source",
+    targetId: "target",
+    source: manager.app.viewState.scene.tokens[0].anchor,
+    target: manager.app.viewState.scene.tokens[1].anchor,
+    x: manager.app.viewState.scene.tokens[0].anchor.x,
+    y: manager.app.viewState.scene.tokens[0].anchor.y,
+    dx: manager.app.viewState.scene.tokens[1].anchor.x - manager.app.viewState.scene.tokens[0].anchor.x,
+    dy: manager.app.viewState.scene.tokens[1].anchor.y - manager.app.viewState.scene.tokens[0].anchor.y,
+    repeat: 1,
+    repeatDelay: 250,
+    playbackRate: 1,
+    label: "firebolt",
+    color: "orange"
+  }]);
+});
+
 test("damage workflow overlay falls back from empty hitTargets to actual workflow targets", async () => {
   const { getOverlayManager } = await import("../scripts/overlay-manager.mjs");
   const manager = getOverlayManager();

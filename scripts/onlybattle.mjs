@@ -3,6 +3,7 @@ import { getInactiveRequiredModules } from "./core/dependencies.mjs";
 import { registerSettings } from "./settings.mjs";
 import { registerMidiTargetingHook } from "./wrappers.mjs";
 import { getOverlayManager, registerMidiOverlayHooks } from "./overlay-manager.mjs";
+import { registerAutoAnimationsBridge } from "./animation-router.mjs";
 import { registerActorSheetHooks } from "./actor-sheet.mjs";
 import {
   buildTomitakeBridgeEvent,
@@ -32,6 +33,12 @@ Hooks.once("ready", () => {
 
   registerMidiTargetingHook();
   registerMidiOverlayHooks();
+  if (game.modules.get("autoanimations")?.active) {
+    const overlay = getOverlayManager();
+    registerAutoAnimationsBridge({
+      showIsoAnimation: (payload) => overlay.showIsoAnimation(payload)
+    });
+  }
 
   globalThis.OnlyBattle = {
     moduleId: MODULE_ID,

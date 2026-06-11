@@ -738,6 +738,57 @@
   top: var(--onlybattle-token-label-top);
 }
 
+.onlybattle-iso-effects {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.onlybattle-iso-effect {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 92px;
+  height: 92px;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  transform-origin: center center;
+}
+
+.onlybattle-iso-effect img,
+.onlybattle-iso-effect video {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  border: 0;
+  object-fit: contain;
+  filter: drop-shadow(0 0 12px rgba(255, 218, 126, 0.72));
+}
+
+.onlybattle-iso-effect-projectile {
+  width: 120px;
+  height: 42px;
+  offset-path: path("M 0 0 L 1 0");
+  offset-rotate: auto;
+  animation: onlybattle-iso-projectile 680ms ease-out both;
+}
+
+.onlybattle-iso-effect-melee {
+  width: 104px;
+  height: 104px;
+  animation: onlybattle-iso-slash 620ms ease-out both;
+}
+
+.onlybattle-iso-effect-burst,
+.onlybattle-iso-effect-area {
+  width: 132px;
+  height: 132px;
+  animation: onlybattle-iso-burst 780ms ease-out both;
+}
+
 .onlybattle-damage-effect {
   --onlybattle-effect-main: rgba(255, 228, 166, 0.95);
   --onlybattle-effect-soft: rgba(255, 126, 82, 0.22);
@@ -1195,5 +1246,55 @@
   100% {
     opacity: 0;
     transform: rotate(18deg) scale(1.32);
+  }
+}
+
+@keyframes onlybattle-iso-projectile {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.7);
+  }
+
+  12% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--onlybattle-effect-dx)), calc(-50% + var(--onlybattle-effect-dy))) scale(1.04);
+  }
+}
+
+@keyframes onlybattle-iso-slash {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(-18deg) scale(0.7);
+  }
+
+  32% {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(8deg) scale(1.1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(18deg) scale(1.22);
+  }
+}
+
+@keyframes onlybattle-iso-burst {
+  0% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--onlybattle-effect-dx)), calc(-50% + var(--onlybattle-effect-dy))) scale(0.55);
+  }
+
+  22% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--onlybattle-effect-dx)), calc(-50% + var(--onlybattle-effect-dy))) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--onlybattle-effect-dx)), calc(-50% + var(--onlybattle-effect-dy))) scale(1.34);
   }
 }

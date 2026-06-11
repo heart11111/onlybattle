@@ -5,6 +5,8 @@
   "ONLYBATTLE.Settings.OnlyInCombat.Hint": "전투 인카운터가 활성화된 동안에만 OnlyBattle 타게팅과 오버레이가 표시됩니다.",
   "ONLYBATTLE.Settings.IsometricRegistry.Name": "Isometric 토큰 등록표",
   "ONLYBATTLE.Settings.IsometricRegistry.Hint": "Actor 또는 Token UUID와 OnlyBattle 이미지 경로 매핑을 저장합니다.",
+  "ONLYBATTLE.Settings.EnableAutoAnimationsBridge.Name": "AutoAnimations 즉발 연출을 아이소 장면으로 표시",
+  "ONLYBATTLE.Settings.EnableAutoAnimationsBridge.Hint": "AutoAnimations가 활성화되어 있을 때 근접, 원거리, 즉발 주문 연출만 OnlyBattle 아이소 오버레이에서 재생합니다. 지속 장판과 템플릿 효과는 기존 캔버스에 남깁니다.",
   "ONLYBATTLE.Settings.TomitakeBridgeEnabled.Name": "Tomitake 브리지 활성화",
   "ONLYBATTLE.Settings.TomitakeBridgeEnabled.Hint": "created-gallery가 활성화되어 있을 때 OnlyBattle 전투 오버레이 이벤트를 Tomitake/Created Gallery가 받을 수 있는 Hook으로 발행합니다. 클라우드 작업은 직접 시작하지 않습니다.",
   "ONLYBATTLE.Settings.Debug.Name": "디버그 로그",

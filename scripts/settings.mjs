@@ -29,6 +29,15 @@ export function registerSettings() {
     default: {}
   });
 
+  game.settings.register(MODULE_ID, SETTINGS.enableAutoAnimationsBridge, {
+    name: "ONLYBATTLE.Settings.EnableAutoAnimationsBridge.Name",
+    hint: "ONLYBATTLE.Settings.EnableAutoAnimationsBridge.Hint",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true
+  });
+
   game.settings.register(MODULE_ID, SETTINGS.tomitakeBridgeEnabled, {
     name: "ONLYBATTLE.Settings.TomitakeBridgeEnabled.Name",
     hint: "ONLYBATTLE.Settings.TomitakeBridgeEnabled.Hint",
