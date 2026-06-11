@@ -24,7 +24,10 @@ export class IsometricRegistryConfig extends foundry.applications.api.Handlebars
   };
 
   async _prepareContext(options) {
-    const entries = Object.entries(getIsometricRegistry()).map(([uuid, path]) => ({ uuid, path }));
+    const entries = Object.entries(getIsometricRegistry()).map(([uuid, value]) => ({
+      uuid,
+      path: typeof value === "string" ? value : value?.iso ?? ""
+    }));
     return {
       ...(await super._prepareContext(options)),
       entries

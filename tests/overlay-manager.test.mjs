@@ -173,6 +173,125 @@ test("combat overlay separates large event cut-ins from side portraits", async (
   assert.deepEqual(manager.app.viewState.scene.portraits.allies.map((portrait) => portrait.id), ["Scene.A.Token.ally"]);
 });
 
+test("combat overlay uses event-specific cut-in art when configured", async () => {
+  const { getOverlayManager } = await import("../scripts/overlay-manager.mjs");
+  const manager = getOverlayManager();
+  manager.close();
+
+  const source = token({
+    uuid: "Scene.A.Token.ally",
+    actorUuid: "Actor.ally",
+    x: 100,
+    y: 100,
+    disposition: 1
+  });
+  source.actor.getFlag = (moduleId, key) => moduleId === "onlybattle" && key === "images"
+    ? { criticalCutin: "actors/ally-critical.webm" }
+    : undefined;
+
+  await manager.show({
+    title: "Rapier",
+    source,
+    targets: [
+      token({
+        uuid: "Scene.A.Token.enemy",
+        actorUuid: "Actor.enemy",
+        x: 300,
+        y: 100,
+        disposition: -1
+      })
+    ],
+    stage: "critical",
+    outcome: "ONLYBATTLE.Overlay.Critical",
+    damageType: ""
+  });
+
+  assert.equal(manager.app.viewState.cutins.allies[0].img, "actors/ally-critical.webm");
+  assert.equal(manager.app.viewState.cutins.allies[0].isVideo, true);
+});
+
+test("combat overlay promotes critical cut-ins into a cinematic banner", async () => {
+  const { getOverlayManager } = await import("../scripts/overlay-manager.mjs");
+  const manager = getOverlayManager();
+  manager.close();
+
+  const source = token({
+    uuid: "Scene.A.Token.ally",
+    actorUuid: "Actor.ally",
+    x: 100,
+    y: 100,
+    disposition: 1
+  });
+  source.actor.getFlag = (moduleId, key) => moduleId === "onlybattle" && key === "images"
+    ? { criticalCutin: "actors/ally-critical.webp" }
+    : undefined;
+
+  await manager.show({
+    title: "Rapier",
+    source,
+    targets: [
+      token({
+        uuid: "Scene.A.Token.enemy",
+        actorUuid: "Actor.enemy",
+        x: 300,
+        y: 100,
+        disposition: -1
+      })
+    ],
+    stage: "critical",
+    outcome: "ONLYBATTLE.Overlay.Critical",
+    damageType: "piercing"
+  });
+
+  assert.deepEqual(manager.app.viewState.cinematicCutin, {
+    ...manager.app.viewState.cutins.allies[0],
+    side: "ally",
+    stage: "critical",
+    title: "Rapier"
+  });
+});
+
+test("combat overlay keeps critical cut-ins visible when damage follows immediately", async () => {
+  const { getOverlayManager } = await import("../scripts/overlay-manager.mjs");
+  const manager = getOverlayManager();
+  manager.close();
+
+  const source = token({
+    uuid: "Scene.A.Token.ally",
+    actorUuid: "Actor.ally",
+    x: 100,
+    y: 100,
+    disposition: 1
+  });
+  const target = token({
+    uuid: "Scene.A.Token.enemy",
+    actorUuid: "Actor.enemy",
+    x: 300,
+    y: 100,
+    disposition: -1
+  });
+
+  await manager.show({
+    title: "Rapier",
+    source,
+    targets: [target],
+    stage: "critical",
+    outcome: "ONLYBATTLE.Overlay.Critical",
+    damageType: ""
+  });
+  await manager.show({
+    title: "Rapier",
+    source,
+    targets: [target],
+    stage: "damage",
+    outcome: "ONLYBATTLE.Overlay.Damage",
+    damageType: "piercing"
+  });
+
+  assert.deepEqual(manager.app.viewState.cutins.allies.map((portrait) => portrait.id), ["Scene.A.Token.ally"]);
+  assert.equal(manager.app.viewState.cutins.allies[0].label, "ONLYBATTLE.Overlay.CriticalBang");
+});
+
 test("combat overlay promotes bloodied targets into large event cut-ins", async () => {
   const { getOverlayManager } = await import("../scripts/overlay-manager.mjs");
   const manager = getOverlayManager();
@@ -210,6 +329,45 @@ test("combat overlay promotes bloodied targets into large event cut-ins", async 
   assert.deepEqual(manager.app.viewState.cutins.allies, []);
   assert.deepEqual(manager.app.viewState.cutins.enemies.map((portrait) => portrait.id), ["Scene.A.Token.enemy"]);
   assert.equal(manager.app.viewState.cutins.enemies[0].label, "ONLYBATTLE.Overlay.BloodiedBang");
+});
+
+test("combat overlay promotes unconscious targets into large event cut-ins", async () => {
+  const { getOverlayManager } = await import("../scripts/overlay-manager.mjs");
+  const manager = getOverlayManager();
+  manager.close();
+
+  await manager.show({
+    title: "Rapier",
+    source: token({
+      uuid: "Scene.A.Token.ally",
+      actorUuid: "Actor.ally",
+      x: 100,
+      y: 100,
+      disposition: 1
+    }),
+    targets: [
+      token({
+        uuid: "Scene.A.Token.enemy",
+        actorUuid: "Actor.enemy",
+        x: 300,
+        y: 100,
+        disposition: -1
+      })
+    ],
+    stage: "damage",
+    outcome: "ONLYBATTLE.Overlay.Damage",
+    damageSummaries: [{
+      tokenUuid: "Scene.A.Token.enemy",
+      actorUuid: "Actor.enemy",
+      damageText: "-18",
+      hpText: "0 HP",
+      unconscious: true
+    }]
+  });
+
+  assert.deepEqual(manager.app.viewState.cutins.allies, []);
+  assert.deepEqual(manager.app.viewState.cutins.enemies.map((portrait) => portrait.id), ["Scene.A.Token.enemy"]);
+  assert.equal(manager.app.viewState.cutins.enemies[0].label, "ONLYBATTLE.Overlay.UnconsciousBang");
 });
 
 test("combat overlay filters the source token out of target portraits", async () => {

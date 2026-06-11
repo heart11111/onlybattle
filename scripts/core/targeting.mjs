@@ -1,6 +1,12 @@
 import { hasValues } from "./collections.mjs";
+import {
+  hasTruthyOption,
+  hasValuedOption
+} from "./midi-options.mjs";
 
 const SELF_TARGET_TYPES = new Set(["", "self", undefined, null]);
+const EXTERNAL_TARGET_FLAGS = ["ignoreUserTargets"];
+const EXTERNAL_TARGET_VALUES = ["targetUuids", "targetsToUse"];
 
 export function isCombatEncounterAvailable(combat) {
   return Boolean(combat);
@@ -57,14 +63,9 @@ export function validateTargetCount(targets, policy = {}) {
 }
 
 export function hasExplicitExternalTargeting(usage = {}) {
-  const midiOptions = usage?.midiOptions ?? {};
   return Boolean(
-    usage.ignoreUserTargets
-      || midiOptions.ignoreUserTargets
-      || hasValues(usage.targetUuids)
-      || hasValues(usage.targetsToUse)
-      || hasValues(midiOptions.targetUuids)
-      || hasValues(midiOptions.targetsToUse)
+    hasTruthyOption(usage, EXTERNAL_TARGET_FLAGS)
+      || hasValuedOption(usage, EXTERNAL_TARGET_VALUES)
   );
 }
 

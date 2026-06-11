@@ -1,27 +1,28 @@
+import { getOnlyBattleImageForToken, hasOnlyBattleImageSetting } from "./image-settings.mjs";
+
 const DEFAULT_SCENE_SIZE = { width: 560, height: 340 };
 const DEFAULT_GRID = { size: 100, distance: 5, units: "ft" };
 const MIN_TOKEN_SCALE = 0.28;
 const SCENE_PADDING = 18;
+const FLOOR_RENDER_PADDING = 2;
+const GRID_PLANE_FIT_CELLS = 3;
 const ISO_PROJECTION_SCALE = 0.5;
+const OVERLAY_GRID_SIZE = DEFAULT_GRID.size;
 const ISO_TOKEN_FOOTPRINT = {
   width: 96,
   aboveAnchor: 76,
   belowAnchor: 20
 };
 const FALLBACK_TOKEN_FOOTPRINT = {
-  width: 52,
-  aboveAnchor: 26,
-  belowAnchor: 26
+  width: 46,
+  aboveAnchor: 46,
+  belowAnchor: 8
 };
 const VIDEO_MEDIA_EXTENSIONS = new Set(["webm", "mp4", "m4v", "ogg", "ogv", "mov"]);
 
 export function getIsoImageForToken(token, registry = {}) {
-  const tokenUuid = token?.document?.uuid;
-  const actorUuid = token?.actor?.uuid ?? token?.document?.actor?.uuid;
-
   return firstImagePath(
-    registry[tokenUuid],
-    registry[actorUuid],
+    getOnlyBattleImageForToken(token, registry, "iso"),
     token?.document?.texture?.src,
     token?.texture?.src,
     token?.document?.img,
@@ -31,14 +32,23 @@ export function getIsoImageForToken(token, registry = {}) {
   );
 }
 
-export function getPortraitForToken(token) {
+export function getPortraitForToken(token, registry = {}) {
   return firstImagePath(
+    getOnlyBattleImageForToken(token, registry, "portrait"),
     token?.actor?.img,
     token?.document?.actor?.img,
     token?.document?.texture?.src,
     token?.texture?.src,
     token?.document?.img,
     token?.actor?.prototypeToken?.texture?.src
+  );
+}
+
+export function getCutinImageForToken(token, registry = {}, key = "cutin") {
+  return firstImagePath(
+    getOnlyBattleImageForToken(token, registry, key),
+    getOnlyBattleImageForToken(token, registry, "cutin"),
+    getPortraitForToken(token, registry)
   );
 }
 
@@ -49,29 +59,38 @@ export function isVideoMediaPath(path) {
   return VIDEO_MEDIA_EXTENSIONS.has(extension);
 }
 
-export function projectCanvasToIso(point, origin, scale = ISO_PROJECTION_SCALE) {
+export function projectCanvasToIso(point, origin, scale = ISO_PROJECTION_SCALE, gridSize = null) {
   const dx = (point?.x ?? 0) - (origin?.x ?? 0);
   const dy = (point?.y ?? 0) - (origin?.y ?? 0);
+  const unitScale = Number.isFinite(gridSize) && gridSize > 0 ? OVERLAY_GRID_SIZE / gridSize : 1;
+  const unitDx = dx * unitScale;
+  const unitDy = dy * unitScale;
 
   return {
-    x: (dx - dy) * scale,
-    y: (dx + dy) * scale * 0.5
+    x: (unitDx - unitDy) * scale,
+    y: (unitDx + unitDy) * scale * 0.5
   };
 }
 
 export function getTokenGridCenter(token, grid = {}) {
-  const gridSize = grid.gridSize ?? grid.size ?? globalThis.canvas?.grid?.size
-    ?? globalThis.canvas?.scene?.grid?.size
-    ?? DEFAULT_GRID.size;
+  const gridSize = resolveGridSize(grid);
   const tokenX = token?.document?.x ?? token?.x;
   const tokenY = token?.document?.y ?? token?.y;
   const width = tokenGridWidth(token);
   const height = tokenGridHeight(token);
 
   if (Number.isFinite(tokenX) && Number.isFinite(tokenY) && gridSize > 0) {
+    const gridCellCenter = getGridCellCenter({ x: tokenX, y: tokenY }, grid);
+    if (gridCellCenter) {
+      return {
+        x: gridCellCenter.x + (((width - 1) * gridSize) / 2),
+        y: gridCellCenter.y + (((height - 1) * gridSize) / 2)
+      };
+    }
+    const topLeft = getSnappedTokenTopLeft({ x: tokenX, y: tokenY }, grid);
     return {
-      x: tokenX + ((width * gridSize) / 2),
-      y: tokenY + ((height * gridSize) / 2)
+      x: topLeft.x + ((width * gridSize) / 2),
+      y: topLeft.y + ((height * gridSize) / 2)
     };
   }
 
@@ -81,12 +100,17 @@ export function getTokenGridCenter(token, grid = {}) {
 export function measureTokenDistance(source, target, grid = {}) {
   const sourceCenter = getTokenGridCenter(source, grid);
   const targetCenter = getTokenGridCenter(target, grid);
-  const gridSize = grid.gridSize ?? grid.size ?? globalThis.canvas?.grid?.size
-    ?? globalThis.canvas?.scene?.grid?.size
-    ?? DEFAULT_GRID.size;
-  const gridDistance = grid.gridDistance ?? grid.distance ?? globalThis.canvas?.scene?.grid?.distance
-    ?? DEFAULT_GRID.distance;
+  const gridSize = resolveGridSize(grid);
+  const gridDistance = resolveGridDistance(grid);
   const units = grid.units ?? globalThis.canvas?.scene?.grid?.units ?? DEFAULT_GRID.units;
+  const measuredDistance = measureWithCanvasGrid(sourceCenter, targetCenter, grid);
+
+  if (Number.isFinite(measuredDistance)) {
+    return {
+      value: Math.round(measuredDistance * 10) / 10,
+      units
+    };
+  }
 
   const dx = targetCenter.x - sourceCenter.x;
   const dy = targetCenter.y - sourceCenter.y;
@@ -112,10 +136,11 @@ export function buildCombatScene({
   ].filter((entry) => entry.token);
 
   const origin = source ? getTokenGridCenter(source, grid) : getTokenGridCenter(participants[0]?.token, grid);
+  const gridSize = resolveGridSize(grid);
   const rawProjected = participants.map(({ role, token }) => {
     const tokenCenter = getTokenGridCenter(token, grid);
     const tokenSize = getTokenGridSize(token);
-    const baseIso = projectCanvasToIso(tokenCenter, origin);
+    const baseIso = projectCanvasToIso(tokenCenter, origin, ISO_PROJECTION_SCALE, gridSize);
     const elevation = getTokenElevation(token);
     const elevationOffset = calculateElevationOffset(elevation, grid);
     const iso = {
@@ -124,8 +149,11 @@ export function buildCombatScene({
     };
     const artMode = hasRegisteredIsoImage(token, registry) ? "iso" : "token";
     const img = getIsoImageForToken(token, registry);
-    const portrait = getPortraitForToken(token);
-    const gridSize = resolveGridSize(grid);
+    const portrait = getPortraitForToken(token, registry);
+    const cutin = getCutinImageForToken(token, registry, "cutin");
+    const criticalCutin = getCutinImageForToken(token, registry, "criticalCutin");
+    const bloodiedCutin = getCutinImageForToken(token, registry, "bloodiedCutin");
+    const unconsciousCutin = getCutinImageForToken(token, registry, "unconsciousCutin");
     return {
       id: token.document?.uuid ?? token.id ?? token.name,
       actorUuid: token.actor?.uuid ?? token.document?.actor?.uuid ?? "",
@@ -135,12 +163,18 @@ export function buildCombatScene({
       isVideo: isVideoMediaPath(img),
       mediaType: isVideoMediaPath(img) ? "video" : "image",
       artMode,
+      tokenArtHeight: tokenArtHeight(artMode),
       portrait,
+      cutin,
+      criticalCutin,
+      bloodiedCutin,
+      unconsciousCutin,
       portraitIsVideo: isVideoMediaPath(portrait),
       iso,
       baseIso,
       gridCenter: tokenCenter,
       gridSize,
+      overlayGridSize: OVERLAY_GRID_SIZE,
       size: tokenSize,
       sizeScale: tokenSize.cells,
       elevation,
@@ -157,22 +191,21 @@ export function buildCombatScene({
     x: (size.width - bounds.width) / 2 - bounds.minX,
     y: (size.height - bounds.height) / 2 - bounds.minY
   };
-  const sceneTokens = annotateSceneTokens(projected.map((entry) => ({
+  const sceneTokensWithoutFootprints = annotateSceneTokens(projected.map((entry) => sceneTokenFromProjected(entry, offset)), damageSummaries);
+  const sourceAnchor = sceneTokensWithoutFootprints.find((token) => token.role === "source") ?? sceneTokensWithoutFootprints[0];
+  const gridOrigin = sourceAnchor ? gridOriginForToken(sourceAnchor) : undefined;
+  const sceneTokens = sceneTokensWithoutFootprints.map((entry) => ({
     ...entry,
-    x: Math.round(entry.iso.x + offset.x),
-    y: Math.round(entry.iso.y + offset.y),
-    floorX: Math.round((entry.baseIso?.x ?? entry.iso.x) + offset.x),
-    floorY: Math.round((entry.baseIso?.y ?? entry.iso.y) + offset.y),
-    visualBounds: offsetVisualBounds(entry.visualBounds, offset)
-  })), damageSummaries);
-  const sourceAnchor = sceneTokens.find((token) => token.role === "source") ?? sceneTokens[0];
+    footprintCells: buildFootprintCellsForToken(entry, gridOrigin)
+  }));
   const bloodied = sceneTokens.filter((token) => token.bloodied).map(portraitFromToken);
+  const unconscious = sceneTokens.filter((token) => token.unconscious).map(portraitFromToken);
   const floorCells = buildFloorCells(sceneTokens);
   const flightLines = buildFlightLines(sceneTokens);
   const isoGrid = buildIsoGrid(size, {
-    origin: sourceAnchor ? { x: sourceAnchor.floorX ?? sourceAnchor.x, y: sourceAnchor.floorY ?? sourceAnchor.y } : undefined,
+    gridOrigin,
     zoom: fit.sceneScale,
-    gridSize: resolveGridSize(grid),
+    gridSize: OVERLAY_GRID_SIZE,
     floorCells
   });
 
@@ -185,6 +218,7 @@ export function buildCombatScene({
     flightLines,
     portraits: buildPortraits(sceneTokens),
     bloodied,
+    unconscious,
     tokens: sceneTokens
   };
 }
@@ -209,11 +243,16 @@ function portraitFromToken(token) {
     img: token.portrait,
     isVideo: isVideoMediaPath(token.portrait),
     mediaType: isVideoMediaPath(token.portrait) ? "video" : "image",
+    cutin: token.cutin,
+    criticalCutin: token.criticalCutin,
+    bloodiedCutin: token.bloodiedCutin,
+    unconsciousCutin: token.unconsciousCutin,
     distance: token.distance,
     lane: portraitLane(token),
     damageText: token.damageText ?? "",
     hpText: token.hpText ?? "",
-    bloodied: Boolean(token.bloodied)
+    bloodied: Boolean(token.bloodied),
+    unconscious: Boolean(token.unconscious)
   };
 }
 
@@ -221,58 +260,104 @@ function portraitLane(token) {
   return Number(token?.disposition) < 0 ? "enemy" : "ally";
 }
 
+function sceneTokenFromProjected(entry, offset) {
+  const anchor = scenePoint(entry.iso, offset);
+  const floor = scenePoint(entry.baseIso ?? entry.iso, offset);
+
+  return {
+    ...entry,
+    anchor,
+    floor,
+    x: anchor.x,
+    y: anchor.y,
+    floorX: floor.x,
+    floorY: floor.y,
+    visualBounds: offsetVisualBounds(entry.visualBounds, offset)
+  };
+}
+
+function scenePoint(point, offset) {
+  return {
+    x: roundCoordinate((point?.x ?? 0) + offset.x),
+    y: roundCoordinate((point?.y ?? 0) + offset.y)
+  };
+}
+
 function buildFloorCells(tokens) {
-  return tokens.flatMap((token) => {
+  return tokens.flatMap((token) => token.footprintCells ?? buildFootprintCellsForToken(token));
+}
+
+function buildFootprintCellsForToken(token, gridOrigin = gridOriginForToken(token)) {
     const width = Math.max(1, Math.ceil(token.size?.width ?? 1));
     const height = Math.max(1, Math.ceil(token.size?.height ?? 1));
     const centerOffsetX = (width - 1) / 2;
     const centerOffsetY = (height - 1) / 2;
+    const basis = gridBasisForToken(token, gridOrigin);
     const cells = [];
 
     for (let row = 0; row < height; row++) {
       for (let column = 0; column < width; column++) {
-        const canvasOffset = {
-          x: (column - centerOffsetX) * token.gridSize,
-          y: (row - centerOffsetY) * token.gridSize
-        };
-        const isoOffset = projectCanvasToIso(canvasOffset, { x: 0, y: 0 });
-        const center = {
-          x: token.floorX + (isoOffset.x * token.sceneScale),
-          y: token.floorY + (isoOffset.y * token.sceneScale)
+        const cellBasis = {
+          u: basis.u + (column - centerOffsetX) - 0.5,
+          v: basis.v + (row - centerOffsetY) - 0.5
         };
         cells.push({
           tokenId: token.id,
           role: token.role,
           lane: portraitLane(token),
-          points: floorCellPoints(center, token.gridStepX, token.gridStepY)
+          rect: {
+            u: roundCoordinate(cellBasis.u),
+            v: roundCoordinate(cellBasis.v),
+            width: 1,
+            height: 1
+          },
+          points: gridCellPoints(cellBasis, {
+            origin: gridOrigin,
+            stepX: token.gridStepX,
+            stepY: token.gridStepY
+          })
         });
       }
     }
 
     return cells;
+}
+
+function gridOriginForToken(token) {
+  return {
+    x: token.floor.x,
+    y: token.floor.y - token.gridStepY
+  };
+}
+
+function gridBasisForToken(token, gridOrigin) {
+  return toIsoBasis(token.floor, {
+    origin: gridOrigin,
+    stepX: token.gridStepX,
+    stepY: token.gridStepY
   });
 }
 
-function floorCellPoints(center, stepX, stepY) {
+function gridCellPoints(cellBasis, basis) {
   return [
-    { x: center.x, y: center.y - stepY },
-    { x: center.x + stepX, y: center.y },
-    { x: center.x, y: center.y + stepY },
-    { x: center.x - stepX, y: center.y }
-  ].map((point) => `${Math.round(point.x)},${Math.round(point.y)}`).join(" ");
+    fromIsoBasis({ u: cellBasis.u, v: cellBasis.v }, basis),
+    fromIsoBasis({ u: cellBasis.u + 1, v: cellBasis.v }, basis),
+    fromIsoBasis({ u: cellBasis.u + 1, v: cellBasis.v + 1 }, basis),
+    fromIsoBasis({ u: cellBasis.u, v: cellBasis.v + 1 }, basis)
+  ].map((point) => `${formatCoordinate(point.x)},${formatCoordinate(point.y)}`).join(" ");
 }
 
 function buildFlightLines(tokens) {
   return tokens
-    .filter((token) => token.elevation > 0 && token.y < token.floorY)
+    .filter((token) => token.elevation > 0 && token.anchor.y < token.floor.y)
     .map((token) => ({
       tokenId: token.id,
       role: token.role,
       lane: portraitLane(token),
-      x1: token.floorX,
-      y1: token.floorY,
-      x2: token.x,
-      y2: token.y
+      x1: token.floor.x,
+      y1: token.floor.y,
+      x2: token.anchor.x,
+      y2: token.anchor.y
     }));
 }
 
@@ -282,7 +367,8 @@ function annotateSceneTokens(tokens, summaries = []) {
       ...token,
       damageText: "",
       hpText: "",
-      bloodied: false
+      bloodied: false,
+      unconscious: false
     }));
   }
 
@@ -297,7 +383,8 @@ function annotateSceneTokens(tokens, summaries = []) {
       ...token,
       damageText: summary?.damageText ?? "",
       hpText: summary?.hpText ?? "",
-      bloodied: Boolean(summary?.bloodied)
+      bloodied: Boolean(summary?.bloodied),
+      unconscious: Boolean(summary?.unconscious)
     };
   });
 }
@@ -342,8 +429,9 @@ function scaleProjectedEntry(entry, sceneScale) {
     ...entry,
     scale: tokenScale,
     sceneScale,
-    gridStepX: roundScale((entry.gridSize ?? DEFAULT_GRID.size) * ISO_PROJECTION_SCALE * sceneScale),
-    gridStepY: roundScale((entry.gridSize ?? DEFAULT_GRID.size) * ISO_PROJECTION_SCALE * 0.5 * sceneScale),
+    gridStepX: roundScale((entry.overlayGridSize ?? OVERLAY_GRID_SIZE) * ISO_PROJECTION_SCALE * sceneScale),
+    gridStepY: roundScale((entry.overlayGridSize ?? OVERLAY_GRID_SIZE) * ISO_PROJECTION_SCALE * 0.5 * sceneScale),
+    labelTop: Math.round(8 * tokenScale * (entry.sizeScale ?? 1)),
     iso: {
       x: entry.iso.x * sceneScale,
       y: entry.iso.y * sceneScale
@@ -363,9 +451,8 @@ function scaleProjectedEntry(entry, sceneScale) {
 function calculateElevationOffset(elevation, grid = {}) {
   if (!Number.isFinite(elevation) || elevation <= 0) return 0;
   const gridDistance = resolveGridDistance(grid);
-  const gridSize = resolveGridSize(grid);
   if (gridDistance <= 0) return 0;
-  return (elevation / gridDistance) * gridSize * ISO_PROJECTION_SCALE * 0.5;
+  return (elevation / gridDistance) * OVERLAY_GRID_SIZE * ISO_PROJECTION_SCALE * 0.5;
 }
 
 function calculateTokenScale(sceneScale) {
@@ -379,7 +466,9 @@ function calculateTokenVisualBounds(entry) {
   const totalScale = scale * sizeScale;
   const halfWidth = (footprint.width * totalScale) / 2;
   const baseIso = entry.baseIso ?? entry.iso;
-  const floorHalfWidth = (((entry.size?.width ?? 1) + (entry.size?.height ?? 1)) * (entry.gridStepX ?? 0)) / 2;
+  const floorHalfWidth = ((((entry.size?.width ?? 1) + (entry.size?.height ?? 1)) * (entry.gridStepX ?? 0)) / 2)
+    + ((entry.gridStepX ?? 0) * GRID_PLANE_FIT_CELLS)
+    + FLOOR_RENDER_PADDING;
   const floorHalfHeight = floorHalfWidth / 2;
   return {
     left: Math.min(entry.iso.x - halfWidth, baseIso.x - floorHalfWidth),
@@ -420,81 +509,87 @@ function roundScale(scale) {
   return Math.round(scale * 1000) / 1000;
 }
 
-function buildIsoGrid(size, { origin, zoom = 1, gridSize = DEFAULT_GRID.size, floorCells = [] } = {}) {
+function roundCoordinate(value) {
+  return Math.round(Number(value ?? 0) * 1000) / 1000;
+}
+
+function formatCoordinate(value) {
+  return String(roundCoordinate(value));
+}
+
+function buildIsoGrid(size, { gridOrigin = null, zoom = 1, gridSize = DEFAULT_GRID.size, floorCells = [] } = {}) {
   const center = { x: size.width / 2, y: size.height / 2 + 8 };
-  const radius = { x: size.width * 0.48, y: size.height * 0.43 };
-  const defaultPoints = [
-    { x: center.x, y: center.y - radius.y },
-    { x: center.x + radius.x, y: center.y },
-    { x: center.x, y: center.y + radius.y },
-    { x: center.x - radius.x, y: center.y }
-  ];
-  const lines = [];
   const stepX = Math.max(8, gridSize * ISO_PROJECTION_SCALE * zoom);
   const stepY = stepX / 2;
-  const points = isoClipPointsFromFloorCells(floorCells, { stepX, stepY }) ?? defaultPoints;
-  const gridOrigin = origin
-    ? { x: origin.x, y: origin.y - stepY }
-    : center;
-  const span = Math.ceil((size.width + size.height) / Math.max(1, stepX)) + 4;
-  const vectorA = { x: stepX, y: stepY };
-  const vectorB = { x: -stepX, y: stepY };
-  const length = Math.ceil((size.width + size.height) / Math.max(1, stepX)) + 4;
-
-  for (let i = -span; i <= span; i++) {
-    const pointA = {
-      x: gridOrigin.x + (vectorB.x * i),
-      y: gridOrigin.y + (vectorB.y * i)
-    };
-    const pointB = {
-      x: gridOrigin.x + (vectorA.x * i),
-      y: gridOrigin.y + (vectorA.y * i)
-    };
-
-    lines.push(makeLine(pointA, vectorA, length));
-    lines.push(makeLine(pointB, vectorB, length));
-  }
+  const origin = gridOrigin ?? center;
+  const rect = gridRectFromFloorCells(floorCells, { margin: 2 });
+  const cells = buildGridCellsFromRect(rect, {
+    origin,
+    stepX,
+    stepY
+  });
+  const clipPoints = gridClipPointsFromRect(rect, { origin, stepX, stepY });
 
   return {
     stepX: Math.round(stepX * 1000) / 1000,
     stepY: Math.round(stepY * 1000) / 1000,
-    clipPoints: points.map((point) => `${Math.round(point.x)},${Math.round(point.y)}`).join(" "),
-    lines
+    origin,
+    clipPoints,
+    cells,
+    lines: []
   };
 }
 
-function isoClipPointsFromFloorCells(floorCells, { stepX, stepY }) {
-  const points = floorCells.flatMap((cell) => parsePointList(cell.points));
-  if (!points.length || stepX <= 0 || stepY <= 0) return null;
+function gridRectFromFloorCells(floorCells, { margin = 2 } = {}) {
+  const rects = floorCells.map((cell) => cell.rect).filter(Boolean);
+  if (!rects.length) {
+    return { minU: -3, minV: -3, maxU: 3, maxV: 3 };
+  }
 
-  const coords = points.map((point) => toIsoBasis(point, { stepX, stepY }));
-  const margin = 1.15;
-  const minU = Math.min(...coords.map((point) => point.u)) - margin;
-  const maxU = Math.max(...coords.map((point) => point.u)) + margin;
-  const minV = Math.min(...coords.map((point) => point.v)) - margin;
-  const maxV = Math.max(...coords.map((point) => point.v)) + margin;
-
-  return [
-    fromIsoBasis({ u: minU, v: minV }, { stepX, stepY }),
-    fromIsoBasis({ u: maxU, v: minV }, { stepX, stepY }),
-    fromIsoBasis({ u: maxU, v: maxV }, { stepX, stepY }),
-    fromIsoBasis({ u: minU, v: maxV }, { stepX, stepY })
-  ];
+  return {
+    minU: Math.floor(Math.min(...rects.map((rect) => rect.u)) - margin),
+    minV: Math.floor(Math.min(...rects.map((rect) => rect.v)) - margin),
+    maxU: Math.ceil(Math.max(...rects.map((rect) => rect.u + rect.width)) + margin),
+    maxV: Math.ceil(Math.max(...rects.map((rect) => rect.v + rect.height)) + margin)
+  };
 }
 
-function toIsoBasis(point, { stepX, stepY }) {
-  const x = Number(point?.x ?? 0);
-  const y = Number(point?.y ?? 0);
+function buildGridCellsFromRect(rect, basis) {
+  const cells = [];
+  for (let u = rect.minU; u < rect.maxU; u++) {
+    for (let v = rect.minV; v < rect.maxV; v++) {
+      cells.push({
+        u,
+        v,
+        points: gridCellPoints({ u, v }, basis)
+      });
+    }
+  }
+  return cells;
+}
+
+function gridClipPointsFromRect(rect, basis) {
+  return [
+    fromIsoBasis({ u: rect.minU, v: rect.minV }, basis),
+    fromIsoBasis({ u: rect.maxU, v: rect.minV }, basis),
+    fromIsoBasis({ u: rect.maxU, v: rect.maxV }, basis),
+    fromIsoBasis({ u: rect.minU, v: rect.maxV }, basis)
+  ].map((point) => `${formatCoordinate(point.x)},${formatCoordinate(point.y)}`).join(" ");
+}
+
+function toIsoBasis(point, { stepX, stepY, origin = { x: 0, y: 0 } }) {
+  const x = Number(point?.x ?? 0) - Number(origin?.x ?? 0);
+  const y = Number(point?.y ?? 0) - Number(origin?.y ?? 0);
   return {
     u: ((y / stepY) + (x / stepX)) / 2,
     v: ((y / stepY) - (x / stepX)) / 2
   };
 }
 
-function fromIsoBasis(point, { stepX, stepY }) {
+function fromIsoBasis(point, { stepX, stepY, origin = { x: 0, y: 0 } }) {
   return {
-    x: (point.u - point.v) * stepX,
-    y: (point.u + point.v) * stepY
+    x: ((point.u - point.v) * stepX) + Number(origin?.x ?? 0),
+    y: ((point.u + point.v) * stepY) + Number(origin?.y ?? 0)
   };
 }
 
@@ -508,23 +603,16 @@ function parsePointList(points) {
     .filter(Boolean);
 }
 
-function makeLine(point, vector, length) {
-  return {
-    x1: Math.round(point.x - (vector.x * length)),
-    y1: Math.round(point.y - (vector.y * length)),
-    x2: Math.round(point.x + (vector.x * length)),
-    y2: Math.round(point.y + (vector.y * length))
-  };
-}
-
 function resolveGridSize(grid = {}) {
-  return positiveNumber(grid.gridSize ?? grid.size ?? globalThis.canvas?.grid?.size
+  const canvasGrid = resolveCanvasGrid(grid);
+  return positiveNumber(grid.gridSize ?? grid.size ?? canvasGrid?.size ?? globalThis.canvas?.grid?.size
     ?? globalThis.canvas?.scene?.grid?.size
     ?? DEFAULT_GRID.size);
 }
 
 function resolveGridDistance(grid = {}) {
-  return positiveNumber(grid.gridDistance ?? grid.distance ?? globalThis.canvas?.scene?.grid?.distance
+  const canvasGrid = resolveCanvasGrid(grid);
+  return positiveNumber(grid.gridDistance ?? grid.distance ?? canvasGrid?.distance ?? globalThis.canvas?.scene?.grid?.distance
     ?? DEFAULT_GRID.distance);
 }
 
@@ -554,9 +642,7 @@ function firstImagePath(...paths) {
 }
 
 function hasRegisteredIsoImage(token, registry = {}) {
-  const tokenUuid = token?.document?.uuid;
-  const actorUuid = token?.actor?.uuid ?? token?.document?.actor?.uuid;
-  return Boolean(firstProvidedPath(registry[tokenUuid], registry[actorUuid]));
+  return hasOnlyBattleImageSetting(token, registry, "iso");
 }
 
 function firstProvidedPath(...paths) {
@@ -565,6 +651,10 @@ function firstProvidedPath(...paths) {
 
 function tokenFootprint(entry) {
   return entry.artMode === "iso" ? ISO_TOKEN_FOOTPRINT : FALLBACK_TOKEN_FOOTPRINT;
+}
+
+function tokenArtHeight(artMode) {
+  return artMode === "iso" ? ISO_TOKEN_FOOTPRINT.aboveAnchor : FALLBACK_TOKEN_FOOTPRINT.aboveAnchor;
 }
 
 function largestFootprint(entries) {
@@ -609,6 +699,56 @@ function positiveNumber(value) {
 }
 
 function gridSizeFromTokenPixels(value) {
-  const gridSize = globalThis.canvas?.grid?.size ?? globalThis.canvas?.scene?.grid?.size ?? DEFAULT_GRID.size;
+  const gridSize = resolveGridSize();
   return gridSize > 0 ? value / gridSize : 1;
+}
+
+function getSnappedTokenTopLeft(point, grid = {}) {
+  const canvasGrid = resolveCanvasGrid(grid);
+  if (!canvasGrid?.getSnappedPoint || canvasGrid.isGridless) return point;
+
+  try {
+    const mode = globalThis.CONST?.GRID_SNAPPING_MODES?.TOP_LEFT_CORNER ?? 0x100;
+    const snapped = canvasGrid.getSnappedPoint(point, { mode, resolution: 1 });
+    if (Number.isFinite(snapped?.x) && Number.isFinite(snapped?.y)) {
+      return { x: snapped.x, y: snapped.y };
+    }
+  } catch (_error) {
+    // Older Foundry builds or custom grids may not accept the v13 snapping behavior object.
+  }
+
+  return point;
+}
+
+function getGridCellCenter(point, grid = {}) {
+  const canvasGrid = resolveCanvasGrid(grid);
+  if (!canvasGrid?.getCenterPoint || canvasGrid.isGridless) return null;
+
+  try {
+    const center = canvasGrid.getCenterPoint(point);
+    if (Number.isFinite(center?.x) && Number.isFinite(center?.y)) {
+      return { x: center.x, y: center.y };
+    }
+  } catch (_error) {
+    return null;
+  }
+
+  return null;
+}
+
+function measureWithCanvasGrid(sourceCenter, targetCenter, grid = {}) {
+  const canvasGrid = resolveCanvasGrid(grid);
+  if (!canvasGrid?.measurePath || canvasGrid.isGridless) return null;
+
+  try {
+    const result = canvasGrid.measurePath([sourceCenter, targetCenter]);
+    return Number.isFinite(result?.distance) ? result.distance : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function resolveCanvasGrid(grid = {}) {
+  if (grid?.getSnappedPoint || grid?.getCenterPoint || grid?.measurePath) return grid;
+  return grid?.api ?? grid?.canvasGrid ?? globalThis.canvas?.grid ?? null;
 }

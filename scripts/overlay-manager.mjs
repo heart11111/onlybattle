@@ -1,4 +1,4 @@
-import { buildCombatScene } from "./core/scene.mjs";
+import { buildCombatScene, isVideoMediaPath } from "./core/scene.mjs";
 import { getDamageEffect } from "./core/damage-effects.mjs";
 import { getOutcomeBadgeKey, getOutcomeState } from "./core/outcome.mjs";
 import {
@@ -12,6 +12,7 @@ import {
   workflowTargets,
   workflowTitle
 } from "./core/workflow-view.mjs";
+import { emitTomitakeBridgeEvent } from "./tomitake-bridge.mjs";
 import { getIsometricRegistry } from "./settings.mjs";
 import { debug } from "./logger.mjs";
 
@@ -54,7 +55,8 @@ class OnlyBattleCombatOverlay extends foundry.applications.api.HandlebarsApplica
       damageEffect: null,
       outcome: "",
       outcomeBadge: "",
-      cutins: emptyCutins()
+      cutins: emptyCutins(),
+      cinematicCutin: null
     };
   }
 
@@ -76,6 +78,7 @@ class OverlayManager {
     this.app = null;
     this.closeTimer = null;
     this.lastParticipants = null;
+    this.criticalCutins = emptyCutins();
   }
 
   async showFromActivity(activity, {
@@ -151,15 +154,30 @@ class OverlayManager {
       damageSummaries
     }), damageEffect);
 
+    const eventCutins = buildEventCutins(scene, stage);
+    const cutins = this.resolveEventCutins(stage, eventCutins);
+    const cinematicCutin = buildCinematicCutin(cutins, stage, title);
+
     await this.app.updateState({
       title,
       scene,
       stage,
       outcome,
       outcomeBadge: outcomeBadge || getOutcomeBadgeKey(stage),
-      cutins: buildEventCutins(scene, stage),
+      cutins,
+      cinematicCutin,
       damageType,
       damageEffect
+    });
+    emitTomitakeBridgeEvent({
+      title,
+      source: normalizedSource,
+      targets: sceneTargets,
+      stage,
+      outcome,
+      outcomeBadge: outcomeBadge || getOutcomeBadgeKey(stage),
+      damageType,
+      damageSummaries
     });
     this.autoCloseOutcomeStage(stage);
   }
@@ -177,12 +195,31 @@ class OverlayManager {
     this.app?.close();
     this.app = null;
     this.lastParticipants = null;
+    this.criticalCutins = emptyCutins();
   }
 
   autoCloseOutcomeStage(stage) {
     const delay = OUTCOME_CLOSE_DELAYS[stage];
     if (!delay) return;
     this.autoClose(delay);
+  }
+
+  resolveEventCutins(stage, eventCutins) {
+    if (stage === "critical") {
+      this.criticalCutins = eventCutins;
+      return eventCutins;
+    }
+
+    if (stage === "damage") {
+      if (hasCutins(eventCutins)) {
+        this.criticalCutins = emptyCutins();
+        return eventCutins;
+      }
+      return hasCutins(this.criticalCutins) ? this.criticalCutins : eventCutins;
+    }
+
+    this.criticalCutins = emptyCutins();
+    return eventCutins;
   }
 }
 
@@ -200,10 +237,11 @@ export function registerMidiOverlayHooks() {
   });
 
   Hooks.on("midi-qol.postAttackRoll", (workflow) => {
-    if (!shouldAnimateMidiWorkflow(workflow)) return true;
-    const outcome = inferMidiAttackOutcome(workflow);
-    if (outcome) overlayManager.showFromWorkflow(workflow, outcome);
-    return true;
+    return showMidiAttackOutcome(workflow);
+  });
+
+  Hooks.on("midi-qol.AttackRollComplete", (workflow) => {
+    return showMidiAttackOutcome(workflow);
   });
 
   Hooks.on("midi-qol.postDamageRoll", (workflow) => {
@@ -227,6 +265,13 @@ export function registerMidiOverlayHooks() {
   });
 }
 
+function showMidiAttackOutcome(workflow) {
+  if (!shouldAnimateMidiWorkflow(workflow)) return true;
+  const outcome = inferMidiAttackOutcome(workflow);
+  if (outcome) overlayManager.showFromWorkflow(workflow, outcome);
+  return true;
+}
+
 function resolveSourceToken(actor) {
   if (!actor) return null;
   return canvas.tokens?.controlled?.find((token) => token.actor === actor)
@@ -246,28 +291,57 @@ function withDamageEffects(scene, damageEffect) {
 
 function buildEventCutins(scene, stage) {
   if (stage === "critical") {
-    return groupCutins([scene?.portraits?.source], "ONLYBATTLE.Overlay.CriticalBang");
+    return groupCutins([scene?.portraits?.source], "ONLYBATTLE.Overlay.CriticalBang", "criticalCutin");
+  }
+
+  if (scene?.unconscious?.length) {
+    return groupCutins(scene.unconscious, "ONLYBATTLE.Overlay.UnconsciousBang", "unconsciousCutin");
   }
 
   if (scene?.bloodied?.length) {
-    return groupCutins(scene.bloodied, "ONLYBATTLE.Overlay.BloodiedBang");
+    return groupCutins(scene.bloodied, "ONLYBATTLE.Overlay.BloodiedBang", "bloodiedCutin");
   }
 
   return emptyCutins();
 }
 
-function groupCutins(portraits = [], label) {
+function groupCutins(portraits = [], label, imageKey = "cutin") {
   const cutins = emptyCutins();
   for (const portrait of portraits.filter(Boolean)) {
-    const entry = { ...portrait, label };
+    const img = portrait[imageKey] || portrait.cutin || portrait.img;
+    const entry = {
+      ...portrait,
+      img,
+      isVideo: isVideoMediaPath(img),
+      mediaType: isVideoMediaPath(img) ? "video" : "image",
+      label
+    };
     if (portrait.lane === "enemy") cutins.enemies.push(entry);
     else cutins.allies.push(entry);
   }
   return cutins;
 }
 
+function buildCinematicCutin(cutins, stage, title) {
+  if (!["critical", "bloodied", "unconscious"].includes(stage) && !hasCutins(cutins)) return null;
+  const enemy = cutins?.enemies?.[0];
+  const ally = cutins?.allies?.[0];
+  const entry = enemy ?? ally;
+  if (!entry) return null;
+  return {
+    ...entry,
+    side: enemy ? "enemy" : "ally",
+    stage,
+    title
+  };
+}
+
 function emptyCutins() {
   return { allies: [], enemies: [] };
+}
+
+function hasCutins(cutins) {
+  return Boolean(cutins?.allies?.length || cutins?.enemies?.length);
 }
 
 function normalizeToken(token) {

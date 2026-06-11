@@ -99,9 +99,18 @@ test("detects explicit midi-qol target configs so automated workflows are not re
   assert.equal(hasExplicitExternalTargeting({ targetUuids: ["Scene.A.Token.1"] }), true);
   assert.equal(hasExplicitExternalTargeting({ targetsToUse: new Set([{}]) }), true);
   assert.equal(hasExplicitExternalTargeting({ ignoreUserTargets: true }), true);
+  assert.equal(hasExplicitExternalTargeting({ workflowOptions: { targetUuids: ["Scene.A.Token.1"] } }), true);
   assert.equal(hasExplicitExternalTargeting({ midiOptions: { targetUuids: ["Scene.A.Token.1"] } }), true);
   assert.equal(hasExplicitExternalTargeting({ midiOptions: { targetsToUse: new Set([{}]) } }), true);
   assert.equal(hasExplicitExternalTargeting({ midiOptions: { ignoreUserTargets: true } }), true);
+  assert.equal(hasExplicitExternalTargeting({
+    midiOptions: {
+      workflowOptions: {
+        targetUuids: ["Scene.A.Token.1"],
+        ignoreUserTargets: true
+      }
+    }
+  }), true);
   assert.equal(hasExplicitExternalTargeting({ midiOptions: { targetUuids: [] } }), false);
 });
 

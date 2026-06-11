@@ -23,17 +23,19 @@ export function workflowDamageSummaries(workflow, tokens = workflowTargets(workf
     const token = matchingDamageToken(damageItem, tokens);
     const numbersVisible = shouldShowDamageNumbers(token, midiConfig);
     const bloodied = shouldShowBloodiedCutin(damageItem, token, midiConfig);
+    const unconscious = shouldShowUnconsciousCutin(damageItem, token, midiConfig);
     const damageText = numbersVisible ? formatDamageText(damageItem) : "";
     const hpText = numbersVisible ? formatRemainingHp(damageItem) : "";
 
-    if (!damageText && !hpText && !bloodied) return null;
+    if (!damageText && !hpText && !bloodied && !unconscious) return null;
 
     return {
       tokenUuid: damageItem.targetUuid ?? token?.document?.uuid ?? "",
       actorUuid: damageItem.actorUuid ?? token?.actor?.uuid ?? "",
       damageText,
       hpText,
-      bloodied
+      bloodied,
+      ...(unconscious ? { unconscious } : {})
     };
   }).filter(Boolean);
 }
@@ -68,6 +70,19 @@ export function shouldShowBloodiedCutin(damageItem, token, midiConfig = midiConf
   return oldPercent > threshold && newPercent <= threshold;
 }
 
+export function shouldShowUnconsciousCutin(damageItem, token, midiConfig = midiConfigSettings()) {
+  if ((midiConfig?.addDead ?? "none") === "none") return false;
+
+  const condition = zeroHpMidiCondition(token, midiConfig);
+  if (!configuredMidiCondition(condition)) return false;
+
+  const oldHp = Number(damageItem?.oldHP);
+  const newHp = Number(damageItem?.newHP);
+  if (![oldHp, newHp].every(Number.isFinite)) return false;
+
+  return oldHp > 0 && newHp <= 0;
+}
+
 export function inferMidiAttackOutcome(workflow) {
   if (isCriticalWorkflow(workflow)) return getOutcomeState("critical");
   if (workflow?.hitTargets?.size > 0) return getOutcomeState("hit");
@@ -87,6 +102,12 @@ export function inferMidiAttackOutcome(workflow) {
 }
 
 function isCriticalWorkflow(workflow) {
+  if (workflow?.isCritical === true) return true;
+  if (workflow?.workflowOptions?.isCritical === true) return true;
+  if (workflow?.options?.isCritical === true) return true;
+  if (workflow?.tracker?.isCritical === true) return true;
+  if (workflow?.attackRollModifierTracker?.isCritical === true) return true;
+
   const rolls = Array.from(workflow?.attackRolls ?? []);
   if (workflow?.attackRoll) rolls.push(workflow.attackRoll);
   if (workflow?.rolls) rolls.push(...Array.from(workflow.rolls));
@@ -140,6 +161,19 @@ function numericDamage(damageItem) {
   }
 
   return Number.isFinite(totalDamage) ? totalDamage : NaN;
+}
+
+function zeroHpMidiCondition(token, midiConfig) {
+  const actor = token?.actor ?? token?.document?.actor;
+  if (actor?.type === "character" || actor?.hasPlayerOwner || actor?.system?.traits?.important) {
+    return midiConfig?.midiUnconsciousCondition;
+  }
+
+  return midiConfig?.midiDeadCondition ?? midiConfig?.midiUnconsciousCondition;
+}
+
+function configuredMidiCondition(condition) {
+  return typeof condition === "string" && condition.trim().length > 0 && condition !== "none";
 }
 
 function midiConfigSettings() {

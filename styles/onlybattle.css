@@ -36,6 +36,43 @@
   color: var(--onlybattle-text);
 }
 
+.onlybattle-actor-config .window-content {
+  background:
+    linear-gradient(180deg, rgba(35, 37, 42, 0.96), rgba(20, 22, 26, 0.98));
+  color: var(--onlybattle-text);
+}
+
+.onlybattle-actor-config-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--onlybattle-text);
+}
+
+.onlybattle-actor-config-fields {
+  display: grid;
+  gap: 8px;
+}
+
+.onlybattle-actor-config-fields label {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.onlybattle-actor-config-fields label > span {
+  color: var(--onlybattle-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.onlybattle-actor-config-path {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px 34px;
+  gap: 6px;
+}
+
 .onlybattle-target-instruction {
   margin: 0;
   padding: 9px 10px;
@@ -215,6 +252,14 @@
   overflow: hidden;
 }
 
+.onlybattle-combat-portrait-stack-source {
+  align-items: flex-end;
+}
+
+.onlybattle-combat-portrait-stack-target {
+  align-items: flex-start;
+}
+
 .onlybattle-event-cutin {
   position: relative;
   width: min(820px, calc(100vw - 42px));
@@ -315,6 +360,153 @@
   white-space: nowrap;
 }
 
+.onlybattle-cinematic-cutin {
+  position: absolute;
+  left: calc(50% - 50vw);
+  z-index: 50;
+  width: 100vw;
+  height: clamp(220px, 34vh, 360px);
+  overflow: hidden;
+  pointer-events: none;
+  isolation: isolate;
+  animation: onlybattle-cinematic-in 420ms cubic-bezier(0.18, 0.86, 0.22, 1) both;
+}
+
+.onlybattle-cinematic-cutin::before,
+.onlybattle-cinematic-cutin::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+
+.onlybattle-cinematic-cutin::before {
+  background:
+    linear-gradient(100deg, rgba(2, 3, 7, 0.94), rgba(23, 5, 12, 0.86) 36%, rgba(142, 17, 42, 0.56) 72%, rgba(5, 6, 11, 0.14)),
+    repeating-linear-gradient(168deg, transparent 0 26px, rgba(255, 57, 98, 0.18) 27px 29px);
+  clip-path: polygon(0 18%, 100% 0, 100% 100%, 0 86%);
+}
+
+.onlybattle-cinematic-cutin::after {
+  background:
+    radial-gradient(circle at 68% 45%, rgba(255, 235, 190, 0.34), transparent 14%),
+    linear-gradient(168deg, transparent 0 45%, rgba(255, 26, 73, 0.82) 46%, rgba(255, 235, 210, 0.92) 48%, rgba(255, 26, 73, 0.74) 50%, transparent 52%),
+    linear-gradient(174deg, transparent 0 61%, rgba(255, 51, 92, 0.74) 62%, rgba(255, 255, 255, 0.92) 63%, rgba(255, 51, 92, 0.72) 64%, transparent 66%);
+  mix-blend-mode: screen;
+}
+
+.onlybattle-cinematic-ally {
+  bottom: calc(50% - 50vh);
+}
+
+.onlybattle-cinematic-enemy {
+  top: calc(50% - 50vh);
+  transform-origin: center top;
+}
+
+.onlybattle-cinematic-character {
+  position: absolute;
+  left: clamp(52px, 11vw, 170px);
+  bottom: -34px;
+  width: clamp(240px, 34vw, 520px);
+  height: clamp(210px, 34vh, 360px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  filter: drop-shadow(0 18px 18px rgba(0, 0, 0, 0.68));
+  transform: rotate(-2deg);
+}
+
+.onlybattle-cinematic-enemy .onlybattle-cinematic-character {
+  top: -30px;
+  bottom: auto;
+}
+
+.onlybattle-cinematic-character img,
+.onlybattle-cinematic-character video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+}
+
+.onlybattle-cinematic-copy {
+  position: absolute;
+  left: clamp(44px, 5vw, 86px);
+  bottom: clamp(42px, 6vh, 76px);
+  display: flex;
+  max-width: min(48vw, 560px);
+  flex-direction: column;
+  gap: 6px;
+  color: #fff;
+  text-shadow: 0 3px 0 #000, 0 0 16px rgba(255, 41, 93, 0.64);
+}
+
+.onlybattle-cinematic-enemy .onlybattle-cinematic-copy {
+  top: clamp(42px, 6vh, 76px);
+  bottom: auto;
+}
+
+.onlybattle-cinematic-name {
+  width: fit-content;
+  padding: 2px 10px;
+  border-left: 3px solid var(--onlybattle-gold);
+  background: linear-gradient(90deg, rgba(255, 42, 87, 0.76), rgba(0, 0, 0, 0));
+  font-size: clamp(16px, 2vw, 24px);
+  font-weight: 900;
+}
+
+.onlybattle-cinematic-copy em {
+  color: var(--onlybattle-gold);
+  font-size: clamp(12px, 1.6vw, 18px);
+  font-style: normal;
+  font-weight: 900;
+}
+
+.onlybattle-cinematic-impact {
+  position: absolute;
+  right: clamp(24px, 6vw, 110px);
+  bottom: clamp(30px, 5vh, 60px);
+  color: #fff8e6;
+  font-size: clamp(42px, 8vw, 132px);
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 0.82;
+  text-shadow:
+    4px 4px 0 #8d0b20,
+    8px 8px 0 rgba(0, 0, 0, 0.86),
+    0 0 18px rgba(255, 58, 93, 0.92);
+  transform: skew(-10deg) rotate(-3deg);
+}
+
+.onlybattle-cinematic-impact::before {
+  content: "CRITICAL!";
+}
+
+.onlybattle-cinematic-bloodied .onlybattle-cinematic-impact::before {
+  content: "BLOODIED!";
+}
+
+.onlybattle-cinematic-unconscious .onlybattle-cinematic-impact::before {
+  content: "DOWN!";
+}
+
+.onlybattle-cinematic-enemy .onlybattle-cinematic-impact {
+  top: clamp(30px, 5vh, 60px);
+  bottom: auto;
+}
+
+.onlybattle-cinematic-streaks {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(168deg, transparent 0 70%, rgba(255, 255, 255, 0.95) 71%, transparent 72%),
+    linear-gradient(172deg, transparent 0 77%, rgba(255, 33, 85, 0.96) 78%, transparent 79%),
+    radial-gradient(circle at 72% 42%, rgba(255, 244, 220, 0.92), transparent 3%);
+  mix-blend-mode: screen;
+  animation: onlybattle-cinematic-streak 720ms ease-out both;
+}
+
 .onlybattle-combat-portrait {
   width: 126px;
   min-height: 152px;
@@ -385,6 +577,15 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
+.onlybattle-combat-portrait-unconscious {
+  border-color: rgba(201, 215, 232, 0.95);
+  box-shadow:
+    0 0 0 1px rgba(201, 215, 232, 0.34),
+    0 12px 28px rgba(0, 0, 0, 0.46),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  filter: saturate(0.8);
+}
+
 .onlybattle-portrait-text {
   display: flex;
   min-width: 0;
@@ -453,25 +654,24 @@
   stroke-width: 1.5;
 }
 
-.onlybattle-iso-grid line {
+.onlybattle-grid-cell {
+  fill: none;
   stroke: rgba(28, 24, 18, 0.46);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
 
 .onlybattle-floor-cell {
-  stroke-width: 1.2;
+  stroke: none;
   vector-effect: non-scaling-stroke;
 }
 
 .onlybattle-floor-cell-ally {
   fill: rgba(79, 214, 126, 0.34);
-  stroke: rgba(91, 236, 142, 0.78);
 }
 
 .onlybattle-floor-cell-enemy {
   fill: rgba(255, 76, 90, 0.34);
-  stroke: rgba(255, 96, 108, 0.8);
 }
 
 .onlybattle-flight-line {
@@ -490,6 +690,8 @@
   height: 0;
   --onlybattle-token-scale: 1;
   --onlybattle-token-size-scale: 1;
+  --onlybattle-token-art-height: 72px;
+  --onlybattle-token-label-top: 24px;
   animation: onlybattle-token-enter 180ms ease-out;
 }
 
@@ -498,8 +700,8 @@
   position: absolute;
   left: 0;
   bottom: 0;
-  width: 72px;
-  height: 72px;
+  width: auto;
+  height: var(--onlybattle-token-art-height);
   max-width: none;
   max-height: none;
   object-fit: contain;
@@ -510,13 +712,7 @@
 
 .onlybattle-iso-token.onlybattle-art-token img,
 .onlybattle-iso-token.onlybattle-art-token video {
-  top: 0;
-  bottom: auto;
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  transform: translate(-50%, -50%) scale(calc(var(--onlybattle-token-scale) * var(--onlybattle-token-size-scale)));
-  transform-origin: center center;
+  transform: translateX(-50%) scale(var(--onlybattle-token-scale));
 }
 
 .onlybattle-iso-token span {
@@ -539,7 +735,7 @@
 }
 
 .onlybattle-iso-token.onlybattle-art-token span {
-  top: calc(24px * var(--onlybattle-token-size-scale) * var(--onlybattle-token-scale));
+  top: var(--onlybattle-token-label-top);
 }
 
 .onlybattle-damage-effect {
@@ -876,6 +1072,35 @@
   100% {
     opacity: 0;
     transform: translate(-50%, -52%) scale(0.94);
+  }
+}
+
+@keyframes onlybattle-cinematic-in {
+  0% {
+    opacity: 0;
+    transform: translateY(48px) skewY(-2deg);
+  }
+  18% {
+    opacity: 1;
+    transform: translateY(-8px) skewY(-1deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) skewY(0deg);
+  }
+}
+
+@keyframes onlybattle-cinematic-streak {
+  0% {
+    opacity: 0;
+    transform: translateX(-20%) scaleX(0.62);
+  }
+  24% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.72;
+    transform: translateX(4%) scaleX(1);
   }
 }
 

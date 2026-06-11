@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   buildCombatScene,
+  getCutinImageForToken,
   getIsoImageForToken,
   getPortraitForToken,
   getTokenGridCenter,
@@ -66,6 +67,29 @@ test("skips empty isometric and token image paths before falling back", () => {
   assert.equal(getIsoImageForToken(source, { "Actor.source": "" }), "actors/fallback.webp");
 });
 
+test("keeps cut-in image paths as lightweight strings on scene portraits", () => {
+  const source = token({
+    uuid: "Scene.A.Token.source",
+    actorUuid: "Actor.source",
+    x: 100,
+    y: 100
+  });
+  source.actor.getFlag = (moduleId, key) => moduleId === "onlybattle" && key === "images"
+    ? {
+        cutin: "actors/source-cutin.webp",
+        criticalCutin: "actors/source-critical.webm",
+        bloodiedCutin: "actors/source-bloodied.webp"
+      }
+    : undefined;
+
+  const scene = buildCombatScene({ source });
+
+  assert.equal(getCutinImageForToken(source, {}, "criticalCutin"), "actors/source-critical.webm");
+  assert.equal(scene.portraits.source.cutin, "actors/source-cutin.webp");
+  assert.equal(scene.portraits.source.criticalCutin, "actors/source-critical.webm");
+  assert.equal(scene.portraits.source.bloodiedCutin, "actors/source-bloodied.webp");
+});
+
 test("projects canvas coordinates into stable isometric coordinates", () => {
   assert.deepEqual(projectCanvasToIso({ x: 100, y: 100 }, { x: 100, y: 100 }), { x: 0, y: 0 });
   assert.deepEqual(projectCanvasToIso({ x: 200, y: 100 }, { x: 100, y: 100 }), { x: 50, y: 25 });
@@ -88,6 +112,106 @@ test("derives token grid centers from occupied grid cells instead of image cente
     x: 200,
     y: 350
   });
+});
+
+test("snaps slightly off-grid token documents to the occupied grid cell center", () => {
+  const gridApi = {
+    size: 100,
+    getSnappedPoint(point, { mode }) {
+      assert.equal(mode, 0x100);
+      return {
+        x: Math.round(point.x / 100) * 100,
+        y: Math.round(point.y / 100) * 100
+      };
+    }
+  };
+  const source = token({
+    uuid: "Scene.A.Token.source",
+    actorUuid: "Actor.source",
+    x: 999,
+    y: 999,
+    documentX: 103,
+    documentY: 98,
+    width: 1,
+    height: 1
+  });
+
+  assert.deepEqual(getTokenGridCenter(source, { gridSize: 100, api: gridApi }), {
+    x: 150,
+    y: 150
+  });
+});
+
+test("uses Foundry grid center points as the source of token footprint centers", () => {
+  let getCenterPointCalled = false;
+  const gridApi = {
+    size: 100,
+    getCenterPoint(point) {
+      getCenterPointCalled = true;
+      assert.deepEqual(point, { x: 103, y: 98 });
+      return { x: 150, y: 150 };
+    },
+    getSnappedPoint() {
+      return { x: 0, y: 0 };
+    }
+  };
+  const source = token({
+    uuid: "Scene.A.Token.source",
+    actorUuid: "Actor.source",
+    x: 999,
+    y: 999,
+    documentX: 103,
+    documentY: 98,
+    width: 2,
+    height: 3
+  });
+
+  assert.deepEqual(getTokenGridCenter(source, { gridSize: 100, api: gridApi }), {
+    x: 200,
+    y: 250
+  });
+  assert.equal(getCenterPointCalled, true);
+});
+
+test("uses Foundry grid measurement when available for displayed combat distance", () => {
+  let measurePathCalled = false;
+  const gridApi = {
+    size: 100,
+    getSnappedPoint(point) {
+      return {
+        x: Math.round(point.x / 100) * 100,
+        y: Math.round(point.y / 100) * 100
+      };
+    },
+    measurePath(points) {
+      measurePathCalled = true;
+      return {
+        distance: Math.max(
+          Math.abs(points[1].x - points[0].x),
+          Math.abs(points[1].y - points[0].y)
+        ) / 100 * 5
+      };
+    }
+  };
+  const source = token({
+    uuid: "Scene.A.Token.source",
+    actorUuid: "Actor.source",
+    x: 999,
+    y: 999,
+    documentX: 103,
+    documentY: 98
+  });
+  const target = token({
+    uuid: "Scene.A.Token.target",
+    actorUuid: "Actor.target",
+    x: 999,
+    y: 999,
+    documentX: 233,
+    documentY: 97
+  });
+
+  assert.equal(measureTokenDistance(source, target, { gridSize: 100, gridDistance: 5, api: gridApi }).value, 5);
+  assert.equal(measurePathCalled, true);
 });
 
 test("builds a centered combat scene from attacker and targets", () => {
@@ -119,11 +243,13 @@ test("builds a centered combat scene from attacker and targets", () => {
   assert.equal(scene.tokens[1].img, "iso/target.webp");
   assert.equal(scene.tokens[0].artMode, "token");
   assert.equal(scene.tokens[1].artMode, "iso");
+  assert.equal(scene.tokens[0].tokenArtHeight, 46);
+  assert.equal(scene.tokens[1].tokenArtHeight, 76);
   assert.equal(scene.portraits.source.img, "actors/fallback.webp");
   assert.equal(scene.portraits.targets[0].img, "actors/fallback.webp");
   assert.equal(scene.tokens[1].distance.value, 10);
-  assert.equal(scene.grid.lines.length > 0, true);
-  assert.equal(scene.grid.lines.some((line) => line.x1 !== line.x2 && line.y1 !== line.y2), true);
+  assert.equal(scene.grid.cells.length > 0, true);
+  assert.equal(scene.grid.cells.every((cell) => cell.points.split(" ").length === 4), true);
   assert.equal(scene.bounds.width > 0, true);
   assert.equal(scene.bounds.height >= 0, true);
 });
@@ -226,6 +352,41 @@ test("adds damage and bloodied annotations to matching scene portraits", () => {
   assert.equal(scene.bloodied.length, 1);
 });
 
+test("adds unconscious annotations to matching scene portraits", () => {
+  const source = token({
+    uuid: "Scene.A.Token.source",
+    actorUuid: "Actor.source",
+    x: 100,
+    y: 100,
+    disposition: 1
+  });
+  const target = token({
+    uuid: "Scene.A.Token.target",
+    actorUuid: "Actor.target",
+    x: 300,
+    y: 100,
+    disposition: -1
+  });
+
+  const scene = buildCombatScene({
+    source,
+    targets: [target],
+    damageSummaries: [{
+      tokenUuid: "Scene.A.Token.target",
+      actorUuid: "Actor.target",
+      damageText: "-18",
+      hpText: "0 HP",
+      unconscious: true
+    }]
+  });
+  const targetPortrait = scene.portraits.enemies[0];
+
+  assert.equal(targetPortrait.damageText, "-18");
+  assert.equal(targetPortrait.hpText, "0 HP");
+  assert.equal(targetPortrait.unconscious, true);
+  assert.equal(scene.unconscious.length, 1);
+});
+
 test("projects large tokens from the center of their occupied grid footprint", () => {
   const source = token({
     uuid: "Scene.A.Token.source",
@@ -277,12 +438,13 @@ test("centers token anchors inside isometric cells instead of on grid lines", ()
   });
 
   const scene = buildCombatScene({ source, targets: [target] });
+  const gridCellPoints = new Set(scene.grid.cells.map((cell) => cell.points));
 
   for (const sceneToken of scene.tokens) {
-    const nearestLineDistance = Math.min(
-      ...scene.grid.lines.map((line) => pointLineDistance(sceneToken, line))
-    );
-    assert.equal(nearestLineDistance > 10, true);
+    assert.deepEqual(sceneToken.anchor, sceneToken.floor);
+    assert.equal(sceneToken.footprintCells.length, 1);
+    assert.deepEqual(diamondCenter(sceneToken.footprintCells[0].points), sceneToken.floor);
+    assert.equal(gridCellPoints.has(sceneToken.footprintCells[0].points), true);
   }
 });
 
@@ -310,13 +472,70 @@ test("keeps token anchors centered when the canvas grid size is not 100px", () =
     grid: { gridSize: 50, gridDistance: 5 }
   });
 
-  assert.equal(scene.grid.stepX, 25);
+  assert.equal(scene.grid.stepX, 50);
+  const gridCellPoints = new Set(scene.grid.cells.map((cell) => cell.points));
   for (const sceneToken of scene.tokens) {
-    const nearestLineDistance = Math.min(
-      ...scene.grid.lines.map((line) => pointLineDistance(sceneToken, line))
-    );
-    assert.equal(nearestLineDistance > 5, true);
+    assert.deepEqual(sceneToken.anchor, sceneToken.floor);
+    assert.equal(sceneToken.footprintCells.length, 1);
+    assert.deepEqual(diamondCenter(sceneToken.footprintCells[0].points), sceneToken.floor);
+    assert.equal(gridCellPoints.has(sceneToken.footprintCells[0].points), true);
   }
+});
+
+test("normalizes isometric scene geometry across different map grid pixel sizes", () => {
+  const smallGridSource = token({
+    uuid: "Scene.A.Token.source",
+    actorUuid: "Actor.source",
+    x: 999,
+    y: 999,
+    documentX: 0,
+    documentY: 0
+  });
+  const smallGridTarget = token({
+    uuid: "Scene.A.Token.target",
+    actorUuid: "Actor.target",
+    x: 999,
+    y: 999,
+    documentX: 50,
+    documentY: 0
+  });
+  const largeGridSource = token({
+    uuid: "Scene.A.Token.source",
+    actorUuid: "Actor.source",
+    x: 999,
+    y: 999,
+    documentX: 0,
+    documentY: 0
+  });
+  const largeGridTarget = token({
+    uuid: "Scene.A.Token.target",
+    actorUuid: "Actor.target",
+    x: 999,
+    y: 999,
+    documentX: 150,
+    documentY: 0
+  });
+
+  const smallGridScene = buildCombatScene({
+    source: smallGridSource,
+    targets: [smallGridTarget],
+    grid: { gridSize: 50, gridDistance: 5 }
+  });
+  const largeGridScene = buildCombatScene({
+    source: largeGridSource,
+    targets: [largeGridTarget],
+    grid: { gridSize: 150, gridDistance: 5 }
+  });
+  const smallTarget = smallGridScene.tokens.find((entry) => entry.role === "target");
+  const largeTarget = largeGridScene.tokens.find((entry) => entry.role === "target");
+  const smallSource = smallGridScene.tokens.find((entry) => entry.role === "source");
+  const largeSource = largeGridScene.tokens.find((entry) => entry.role === "source");
+
+  assert.equal(smallGridScene.grid.stepX, 50);
+  assert.equal(largeGridScene.grid.stepX, 50);
+  assert.equal(smallTarget.x - smallSource.x, largeTarget.x - largeSource.x);
+  assert.equal(smallTarget.y - smallSource.y, largeTarget.y - largeSource.y);
+  assert.equal(smallTarget.scale, largeTarget.scale);
 });
 
 test("colors every occupied floor cell by ally and enemy disposition", () => {
@@ -377,6 +596,236 @@ test("centers normal token anchors on their occupied floor cell", () => {
   });
 });
 
+test("uses scene-space anchor, floor, and footprint cells as the single render coordinate source", () => {
+  const source = token({
+    uuid: "Scene.A.Token.source",
+    actorUuid: "Actor.source",
+    x: 999,
+    y: 999,
+    documentX: 0,
+    documentY: 0,
+    elevation: 10
+  });
+  const largeTarget = token({
+    uuid: "Scene.A.Token.large",
+    actorUuid: "Actor.large",
+    x: 999,
+    y: 999,
+    documentX: 100,
+    documentY: 0,
+    width: 2,
+    height: 2
+  });
+
+  const scene = buildCombatScene({
+    source,
+    targets: [largeTarget],
+    grid: { gridSize: 100, gridDistance: 5 }
+  });
+  const sourceSceneToken = scene.tokens.find((entry) => entry.role === "source");
+  const targetSceneToken = scene.tokens.find((entry) => entry.role === "target");
+
+  assert.deepEqual(sourceSceneToken.anchor, { x: sourceSceneToken.x, y: sourceSceneToken.y });
+  assert.deepEqual(sourceSceneToken.floor, { x: sourceSceneToken.floorX, y: sourceSceneToken.floorY });
+  assert.equal(sourceSceneToken.anchor.y < sourceSceneToken.floor.y, true);
+  assert.equal(sourceSceneToken.footprintCells.length, 1);
+  assert.deepEqual(diamondCenter(sourceSceneToken.footprintCells[0].points), sourceSceneToken.floor);
+
+  assert.deepEqual(targetSceneToken.anchor, { x: targetSceneToken.x, y: targetSceneToken.y });
+  assert.deepEqual(targetSceneToken.floor, { x: targetSceneToken.floorX, y: targetSceneToken.floorY });
+  assert.equal(targetSceneToken.footprintCells.length, 4);
+  assert.deepEqual(scene.floorCells.filter((cell) => cell.tokenId === targetSceneToken.id), targetSceneToken.footprintCells);
+});
+
+test("uses the exact rendered grid cell polygons for occupied floor cells", () => {
+  const source = token({
+    uuid: "Scene.A.Token.source",
+    actorUuid: "Actor.source",
+    x: 999,
+    y: 999,
+    documentX: 0,
+    documentY: 0
+  });
+  const target = token({
+    uuid: "Scene.A.Token.target",
+    actorUuid: "Actor.target",
+    x: 999,
+    y: 999,
+    documentX: 100,
+    documentY: 0
+  });
+
+  const scene = buildCombatScene({
+    source,
+    targets: [target],
+    grid: { gridSize: 100, gridDistance: 5 }
+  });
+  const gridCellPoints = new Set(scene.grid.cells.map((cell) => cell.points));
+
+  for (const cell of scene.floorCells) {
+    assert.equal(gridCellPoints.has(cell.points), true);
+  }
+});
+
+test("builds the isometric plane from the same rendered grid cell bounds", () => {
+  const source = token({
+    uuid: "Scene.A.Token.source",
+    actorUuid: "Actor.source",
+    x: 999,
+    y: 999,
+    documentX: 0,
+    documentY: 0
+  });
+  const target = token({
+    uuid: "Scene.A.Token.target",
+    actorUuid: "Actor.target",
+    x: 999,
+    y: 999,
+    documentX: 100,
+    documentY: 0
+  });
+
+  const scene = buildCombatScene({
+    source,
+    targets: [target],
+    grid: { gridSize: 100, gridDistance: 5 }
+  });
+  const clipPoints = parsePolygon(scene.grid.clipPoints);
+  const gridPoints = scene.grid.cells.flatMap((cell) => parsePolygon(cell.points));
+  const minX = Math.min(...gridPoints.map((point) => point.x));
+  const maxX = Math.max(...gridPoints.map((point) => point.x));
+  const minY = Math.min(...gridPoints.map((point) => point.y));
+  const maxY = Math.max(...gridPoints.map((point) => point.y));
+
+  assert.equal(clipPoints.some((point) => point.x === minX), true);
+  assert.equal(clipPoints.some((point) => point.x === maxX), true);
+  assert.equal(clipPoints.some((point) => point.y === minY), true);
+  assert.equal(clipPoints.some((point) => point.y === maxY), true);
+});
+
+test("keeps scaled distant floor cells on the same grid lattice", () => {
+  const source = token({
+    uuid: "Scene.A.Token.source",
+    actorUuid: "Actor.source",
+    x: 999,
+    y: 999,
+    documentX: 0,
+    documentY: 0
+  });
+  const target = token({
+    uuid: "Scene.A.Token.target",
+    actorUuid: "Actor.target",
+    x: 999,
+    y: 999,
+    documentX: 900,
+    documentY: 600
+  });
+
+  const scene = buildCombatScene({
+    source,
+    targets: [target],
+    grid: { gridSize: 100, gridDistance: 5 }
+  });
+
+  assert.equal(scene.zoom < 1, true);
+  const gridCellPoints = new Set(scene.grid.cells.map((cell) => cell.points));
+  for (const cell of scene.floorCells) {
+    assert.equal(gridCellPoints.has(cell.points), true);
+  }
+});
+
+test("keeps auto-scaled occupied cells on the exact same grid basis", () => {
+  const source = token({
+    uuid: "Scene.A.Token.source",
+    actorUuid: "Actor.source",
+    x: 999,
+    y: 999,
+    documentX: 0,
+    documentY: 0
+  });
+  const target = token({
+    uuid: "Scene.A.Token.target",
+    actorUuid: "Actor.target",
+    x: 999,
+    y: 999,
+    documentX: 1200,
+    documentY: -500
+  });
+
+  const scene = buildCombatScene({
+    source,
+    targets: [target],
+    grid: { gridSize: 100, gridDistance: 5 }
+  });
+  assert.equal(scene.zoom < 1, true);
+  for (const cell of scene.floorCells) {
+    for (const point of parsePolygon(cell.points)) {
+      assert.equal(gridBasisResidual(point, {
+        origin: scene.grid.origin,
+        stepX: scene.grid.stepX,
+        stepY: scene.grid.stepY
+      }) < 0.001, true);
+    }
+  }
+});
+
+test("keeps every rendered floor cell inside the scene padding after distant fit", () => {
+  const source = token({
+    uuid: "Scene.A.Token.source",
+    actorUuid: "Actor.source",
+    x: 999,
+    y: 999,
+    documentX: 0,
+    documentY: 0
+  });
+  const target = token({
+    uuid: "Scene.A.Token.target",
+    actorUuid: "Actor.target",
+    x: 999,
+    y: 999,
+    documentX: 1200,
+    documentY: -500
+  });
+
+  const scene = buildCombatScene({
+    source,
+    targets: [target],
+    size: { width: 560, height: 340 },
+    grid: { gridSize: 100, gridDistance: 5 }
+  });
+  const floorPoints = scene.floorCells.flatMap((cell) => parsePolygon(cell.points));
+  const gridCellPoints = new Set(scene.grid.cells.map((cell) => cell.points));
+
+  assert.equal(floorPoints.every((point) => point.x >= 18), true);
+  assert.equal(floorPoints.every((point) => point.x <= scene.size.width - 18), true);
+  assert.equal(floorPoints.every((point) => point.y >= 18), true);
+  assert.equal(floorPoints.every((point) => point.y <= scene.size.height - 18), true);
+  assert.equal(scene.floorCells.every((cell) => gridCellPoints.has(cell.points)), true);
+});
+
+test("keeps fallback token art unboxed while anchoring it to the isometric cell center", () => {
+  const source = token({
+    uuid: "Scene.A.Token.source",
+    actorUuid: "Actor.source",
+    x: 999,
+    y: 999,
+    documentX: 0,
+    documentY: 0
+  });
+
+  const scene = buildCombatScene({
+    source,
+    grid: { gridSize: 100, gridDistance: 5 }
+  });
+  const sceneToken = scene.tokens[0];
+
+  assert.equal("tokenStandWidth" in sceneToken, false);
+  assert.equal("tokenStandHeight" in sceneToken, false);
+  assert.deepEqual(sceneToken.anchor, sceneToken.floor);
+  assert.equal(sceneToken.tokenArtHeight, 46);
+  assert.equal(Number.isFinite(sceneToken.labelTop), true);
+});
+
 test("raises flying tokens and connects them back to their occupied floor", () => {
   const source = token({
     uuid: "Scene.A.Token.source",
@@ -413,13 +862,12 @@ test("uses actor portrait art separately from isometric token art", () => {
   assert.equal(getPortraitForToken(source), "actors/fallback.webp");
 });
 
-function pointLineDistance(point, line) {
-  const numerator = Math.abs(
-    ((line.x2 - line.x1) * (line.y1 - point.y))
-      - ((line.x1 - point.x) * (line.y2 - line.y1))
-  );
-  const denominator = Math.hypot(line.x2 - line.x1, line.y2 - line.y1);
-  return denominator > 0 ? numerator / denominator : Infinity;
+function gridBasisResidual(point, { origin, stepX, stepY }) {
+  const x = Number(point.x ?? 0) - Number(origin.x ?? 0);
+  const y = Number(point.y ?? 0) - Number(origin.y ?? 0);
+  const u = ((y / stepY) + (x / stepX)) / 2;
+  const v = ((y / stepY) - (x / stepX)) / 2;
+  return Math.max(Math.abs(u - Math.round(u)), Math.abs(v - Math.round(v)));
 }
 
 function diamondCenter(points) {

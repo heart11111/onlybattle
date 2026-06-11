@@ -5,6 +5,8 @@
   "ONLYBATTLE.Settings.OnlyInCombat.Hint": "전투 인카운터가 활성화된 동안에만 OnlyBattle 타게팅과 오버레이가 표시됩니다.",
   "ONLYBATTLE.Settings.IsometricRegistry.Name": "Isometric 토큰 등록표",
   "ONLYBATTLE.Settings.IsometricRegistry.Hint": "Actor 또는 Token UUID와 OnlyBattle 이미지 경로 매핑을 저장합니다.",
+  "ONLYBATTLE.Settings.TomitakeBridgeEnabled.Name": "Tomitake 브리지 활성화",
+  "ONLYBATTLE.Settings.TomitakeBridgeEnabled.Hint": "created-gallery가 활성화되어 있을 때 OnlyBattle 전투 오버레이 이벤트를 Tomitake/Created Gallery가 받을 수 있는 Hook으로 발행합니다. 클라우드 작업은 직접 시작하지 않습니다.",
   "ONLYBATTLE.Settings.Debug.Name": "디버그 로그",
   "ONLYBATTLE.Settings.Debug.Hint": "OnlyBattle 진단 로그를 콘솔에 출력합니다.",
   "ONLYBATTLE.Error.RequiredModulesInactive": "OnlyBattle은 활성화된 필수 모듈이 필요합니다: {modules}",
@@ -30,6 +32,7 @@
   "ONLYBATTLE.Overlay.MissBang": "MISS!",
   "ONLYBATTLE.Overlay.DamageBang": "DAMAGE!",
   "ONLYBATTLE.Overlay.BloodiedBang": "BLOODIED!",
+  "ONLYBATTLE.Overlay.UnconsciousBang": "UNCONSCIOUS!",
   "ONLYBATTLE.Registry.Title": "OnlyBattle Isometric 토큰",
   "ONLYBATTLE.Registry.MenuName": "OnlyBattle Isometric 토큰",
   "ONLYBATTLE.Registry.MenuLabel": "설정",
@@ -38,5 +41,14 @@
   "ONLYBATTLE.Registry.UUID": "Actor 또는 Token UUID",
   "ONLYBATTLE.Registry.ImagePath": "이미지 경로",
   "ONLYBATTLE.Registry.Add": "매핑 추가",
-  "ONLYBATTLE.Registry.Saved": "OnlyBattle isometric 토큰 매핑을 저장했습니다."
+  "ONLYBATTLE.Registry.Saved": "OnlyBattle isometric 토큰 매핑을 저장했습니다.",
+  "ONLYBATTLE.ActorConfig.Title": "OnlyBattle 이미지 설정",
+  "ONLYBATTLE.ActorConfig.Help": "{actor}의 OnlyBattle 이미지 경로만 저장합니다. 이미지는 전투 오버레이가 필요할 때만 로드됩니다.",
+  "ONLYBATTLE.ActorConfig.Iso": "아이소 토큰",
+  "ONLYBATTLE.ActorConfig.Portrait": "초상화",
+  "ONLYBATTLE.ActorConfig.Cutin": "기본 컷인",
+  "ONLYBATTLE.ActorConfig.CriticalCutin": "치명타 컷인",
+  "ONLYBATTLE.ActorConfig.BloodiedCutin": "블러디드 컷인",
+  "ONLYBATTLE.ActorConfig.UnconsciousCutin": "무의식 컷인",
+  "ONLYBATTLE.ActorConfig.Saved": "OnlyBattle 이미지 설정을 저장했습니다."
 }

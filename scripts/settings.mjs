@@ -29,6 +29,15 @@ export function registerSettings() {
     default: {}
   });
 
+  game.settings.register(MODULE_ID, SETTINGS.tomitakeBridgeEnabled, {
+    name: "ONLYBATTLE.Settings.TomitakeBridgeEnabled.Name",
+    hint: "ONLYBATTLE.Settings.TomitakeBridgeEnabled.Hint",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: false
+  });
+
   game.settings.registerMenu(MODULE_ID, "isometricRegistryMenu", {
     name: "ONLYBATTLE.Registry.MenuName",
     label: "ONLYBATTLE.Registry.MenuLabel",

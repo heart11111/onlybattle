@@ -6,6 +6,7 @@ import {
   inferMidiAttackOutcome,
   shouldShowBloodiedCutin,
   shouldShowDamageNumbers,
+  shouldShowUnconsciousCutin,
   workflowDamageSummaries,
   workflowTargets,
   workflowTitle
@@ -116,6 +117,62 @@ test("detects a midi-qol wounded threshold crossing for the bloodied cut-in", ()
   assert.equal(shouldShowBloodiedCutin({ oldHP: 18, newHP: 12 }, target, settings), false);
 });
 
+test("detects midi-qol configured zero HP status for the unconscious cut-in", () => {
+  const settings = {
+    addDead: "overlay",
+    midiUnconsciousCondition: "unconscious",
+    midiDeadCondition: "dead"
+  };
+
+  assert.equal(shouldShowUnconsciousCutin({ oldHP: 6, newHP: 0 }, {}, settings), true);
+  assert.equal(shouldShowUnconsciousCutin({ oldHP: 0, newHP: 0 }, {}, settings), false);
+  assert.equal(shouldShowUnconsciousCutin({ oldHP: 6, newHP: 0 }, {}, { ...settings, addDead: "none" }), false);
+  assert.equal(shouldShowUnconsciousCutin({
+    oldHP: 6,
+    newHP: 0
+  }, {}, {
+    addDead: "overlay",
+    midiUnconsciousCondition: "none",
+    midiDeadCondition: "none"
+  }), false);
+});
+
+test("adds unconscious status annotations from midi-qol damageList", () => {
+  const target = {
+    document: { uuid: "Scene.A.Token.target" },
+    actor: {
+      uuid: "Actor.target",
+      hasPlayerOwner: false,
+      system: { attributes: { hp: { max: 30 } } }
+    }
+  };
+
+  assert.deepEqual(
+    workflowDamageSummaries({
+      damageList: [{
+        targetUuid: "Scene.A.Token.target",
+        actorUuid: "Actor.target",
+        hpDamage: 18,
+        oldHP: 12,
+        newHP: 0
+      }]
+    }, [target], {
+      playerDamageCard: "npcplayerresults",
+      addDead: "overlay",
+      midiUnconsciousCondition: "unconscious",
+      midiDeadCondition: "dead"
+    }),
+    [{
+      tokenUuid: "Scene.A.Token.target",
+      actorUuid: "Actor.target",
+      damageText: "-18",
+      hpText: "0 HP",
+      bloodied: false,
+      unconscious: true
+    }]
+  );
+});
+
 test("infers midi attack miss when hitTargets are empty and auto check hit is enabled", () => {
   globalThis.game = {
     settings: {
@@ -142,6 +199,21 @@ test("infers midi critical before ordinary hit targets", () => {
     inferMidiAttackOutcome({
       hitTargets: new Set([{ id: "target" }]),
       attackRoll: { total: 20, isCritical: true }
+    }),
+    {
+      outcome: "ONLYBATTLE.Overlay.Critical",
+      outcomeBadge: "ONLYBATTLE.Overlay.CriticalBang",
+      stage: "critical"
+    }
+  );
+});
+
+test("infers midi critical from workflow-level critical state", () => {
+  assert.deepEqual(
+    inferMidiAttackOutcome({
+      isCritical: true,
+      hitTargets: new Set([{ id: "target" }]),
+      attackRoll: { total: 20 }
     }),
     {
       outcome: "ONLYBATTLE.Overlay.Critical",

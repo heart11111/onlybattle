@@ -3,10 +3,17 @@ import { getInactiveRequiredModules } from "./core/dependencies.mjs";
 import { registerSettings } from "./settings.mjs";
 import { registerMidiTargetingHook } from "./wrappers.mjs";
 import { getOverlayManager, registerMidiOverlayHooks } from "./overlay-manager.mjs";
+import { registerActorSheetHooks } from "./actor-sheet.mjs";
+import {
+  buildTomitakeBridgeEvent,
+  emitTomitakeBridgeEvent,
+  isTomitakeBridgeEnabled
+} from "./tomitake-bridge.mjs";
 import { warn } from "./logger.mjs";
 
 Hooks.once("init", () => {
   registerSettings();
+  registerActorSheetHooks();
 });
 
 Hooks.once("ready", () => {
@@ -28,6 +35,11 @@ Hooks.once("ready", () => {
 
   globalThis.OnlyBattle = {
     moduleId: MODULE_ID,
-    overlay: getOverlayManager()
+    overlay: getOverlayManager(),
+    tomitakeBridge: {
+      buildEvent: buildTomitakeBridgeEvent,
+      emitEvent: emitTomitakeBridgeEvent,
+      isEnabled: isTomitakeBridgeEnabled
+    }
   };
 });

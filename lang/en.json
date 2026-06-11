@@ -5,6 +5,8 @@
   "ONLYBATTLE.Settings.OnlyInCombat.Hint": "OnlyBattle targeting and overlays appear only while a combat encounter is active.",
   "ONLYBATTLE.Settings.IsometricRegistry.Name": "Isometric token registry",
   "ONLYBATTLE.Settings.IsometricRegistry.Hint": "Stores Actor or Token UUID to OnlyBattle image path mappings.",
+  "ONLYBATTLE.Settings.TomitakeBridgeEnabled.Name": "Enable Tomitake bridge",
+  "ONLYBATTLE.Settings.TomitakeBridgeEnabled.Hint": "When created-gallery is active, publish OnlyBattle combat overlay events to hooks that Tomitake/Created Gallery can consume. This does not start cloud jobs by itself.",
   "ONLYBATTLE.Settings.Debug.Name": "Debug logging",
   "ONLYBATTLE.Settings.Debug.Hint": "Write OnlyBattle diagnostic logs to the console.",
   "ONLYBATTLE.Error.RequiredModulesInactive": "OnlyBattle requires active required module(s): {modules}",
@@ -30,6 +32,7 @@
   "ONLYBATTLE.Overlay.MissBang": "MISS!",
   "ONLYBATTLE.Overlay.DamageBang": "DAMAGE!",
   "ONLYBATTLE.Overlay.BloodiedBang": "BLOODIED!",
+  "ONLYBATTLE.Overlay.UnconsciousBang": "UNCONSCIOUS!",
   "ONLYBATTLE.Registry.Title": "OnlyBattle Isometric Tokens",
   "ONLYBATTLE.Registry.MenuName": "OnlyBattle Isometric Tokens",
   "ONLYBATTLE.Registry.MenuLabel": "Configure",
@@ -38,5 +41,14 @@
   "ONLYBATTLE.Registry.UUID": "Actor or Token UUID",
   "ONLYBATTLE.Registry.ImagePath": "Image path",
   "ONLYBATTLE.Registry.Add": "Add Mapping",
-  "ONLYBATTLE.Registry.Saved": "OnlyBattle isometric token mappings saved."
+  "ONLYBATTLE.Registry.Saved": "OnlyBattle isometric token mappings saved.",
+  "ONLYBATTLE.ActorConfig.Title": "OnlyBattle Image Settings",
+  "ONLYBATTLE.ActorConfig.Help": "Stores only image path strings for {actor}. Media loads only when the combat overlay needs it.",
+  "ONLYBATTLE.ActorConfig.Iso": "Iso Token",
+  "ONLYBATTLE.ActorConfig.Portrait": "Portrait",
+  "ONLYBATTLE.ActorConfig.Cutin": "Default Cut-in",
+  "ONLYBATTLE.ActorConfig.CriticalCutin": "Critical Cut-in",
+  "ONLYBATTLE.ActorConfig.BloodiedCutin": "Bloodied Cut-in",
+  "ONLYBATTLE.ActorConfig.UnconsciousCutin": "Unconscious Cut-in",
+  "ONLYBATTLE.ActorConfig.Saved": "OnlyBattle image settings saved."
 }

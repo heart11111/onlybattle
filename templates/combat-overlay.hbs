@@ -5,33 +5,55 @@
     {{#if damageType}}<em>{{damageType}}</em>{{/if}}
   </div>
 
-  {{#if cutins.enemies}}
-    <div class="onlybattle-event-cutin onlybattle-event-cutin-enemy">
-      {{#each cutins.enemies}}
-        <div class="onlybattle-event-cutin-card onlybattle-combat-portrait-enemy {{#if bloodied}}onlybattle-combat-portrait-bloodied{{/if}}">
+  {{#if cinematicCutin}}
+    {{#with cinematicCutin}}
+      <div class="onlybattle-cinematic-cutin onlybattle-cinematic-{{side}} onlybattle-cinematic-{{stage}}">
+        <div class="onlybattle-cinematic-streaks" aria-hidden="true"></div>
+        <div class="onlybattle-cinematic-character">
           {{#if isVideo}}
             <video src="{{img}}" aria-label="{{name}}" autoplay loop muted playsinline></video>
           {{else}}
             <img src="{{img}}" alt="{{name}}" />
           {{/if}}
-          <div class="onlybattle-event-cutin-text">
-            <b>{{localize label}}</b>
-            <strong>{{name}}</strong>
-            <div class="onlybattle-portrait-stats">
-              {{#if damageText}}<span class="onlybattle-damage-chip">{{damageText}}</span>{{/if}}
-              {{#if hpText}}<span class="onlybattle-hp-chip">{{hpText}}</span>{{/if}}
-            </div>
-          </div>
         </div>
-      {{/each}}
-    </div>
+        <div class="onlybattle-cinematic-copy">
+          <span class="onlybattle-cinematic-name">{{name}}</span>
+          <em>{{title}}</em>
+        </div>
+        <div class="onlybattle-cinematic-impact"></div>
+      </div>
+    {{/with}}
   {{/if}}
 
+  {{#unless cinematicCutin}}
+    {{#if cutins.enemies}}
+      <div class="onlybattle-event-cutin onlybattle-event-cutin-enemy">
+        {{#each cutins.enemies}}
+          <div class="onlybattle-event-cutin-card onlybattle-combat-portrait-enemy {{#if bloodied}}onlybattle-combat-portrait-bloodied{{/if}} {{#if unconscious}}onlybattle-combat-portrait-unconscious{{/if}}">
+            {{#if isVideo}}
+              <video src="{{img}}" aria-label="{{name}}" autoplay loop muted playsinline></video>
+            {{else}}
+              <img src="{{img}}" alt="{{name}}" />
+            {{/if}}
+            <div class="onlybattle-event-cutin-text">
+              <b>{{localize label}}</b>
+              <strong>{{name}}</strong>
+              <div class="onlybattle-portrait-stats">
+                {{#if damageText}}<span class="onlybattle-damage-chip">{{damageText}}</span>{{/if}}
+                {{#if hpText}}<span class="onlybattle-hp-chip">{{hpText}}</span>{{/if}}
+              </div>
+            </div>
+          </div>
+        {{/each}}
+      </div>
+    {{/if}}
+  {{/unless}}
+
   <div class="onlybattle-combat-frame">
-    {{#if scene.portraits.enemies}}
-      <aside class="onlybattle-combat-portrait-stack onlybattle-combat-portrait-stack-enemy">
-        {{#each scene.portraits.enemies}}
-          <div class="onlybattle-combat-portrait onlybattle-combat-portrait-enemy {{#if bloodied}}onlybattle-combat-portrait-bloodied{{/if}}">
+    {{#if scene.portraits.source}}
+      <aside class="onlybattle-combat-portrait-stack onlybattle-combat-portrait-stack-source">
+        {{#with scene.portraits.source}}
+          <div class="onlybattle-combat-portrait onlybattle-combat-portrait-source {{#if bloodied}}onlybattle-combat-portrait-bloodied{{/if}} {{#if unconscious}}onlybattle-combat-portrait-unconscious{{/if}}">
             {{#if isVideo}}
               <video src="{{img}}" aria-label="{{name}}" autoplay loop muted playsinline></video>
             {{else}}
@@ -42,11 +64,12 @@
               <div class="onlybattle-portrait-stats">
                 {{#if damageText}}<span class="onlybattle-damage-chip">{{damageText}}</span>{{/if}}
                 {{#if hpText}}<span class="onlybattle-hp-chip">{{hpText}}</span>{{/if}}
+                {{#if unconscious}}<b>{{localize "ONLYBATTLE.Overlay.UnconsciousBang"}}</b>{{/if}}
                 {{#if bloodied}}<b>{{localize "ONLYBATTLE.Overlay.BloodiedBang"}}</b>{{/if}}
               </div>
             </div>
           </div>
-        {{/each}}
+        {{/with}}
       </aside>
     {{/if}}
 
@@ -74,9 +97,9 @@
             ></polygon>
           {{/each}}
         </g>
-        <g clip-path="url(#onlybattle-grid-clip)">
-          {{#each scene.grid.lines}}
-            <line x1="{{x1}}" y1="{{y1}}" x2="{{x2}}" y2="{{y2}}"></line>
+        <g class="onlybattle-grid-cells" clip-path="url(#onlybattle-grid-clip)">
+          {{#each scene.grid.cells}}
+            <polygon class="onlybattle-grid-cell" points="{{points}}"></polygon>
           {{/each}}
         </g>
         <g class="onlybattle-flight-lines">
@@ -96,7 +119,7 @@
       {{#each scene.tokens}}
         <div
           class="onlybattle-iso-token onlybattle-role-{{role}} onlybattle-art-{{artMode}}"
-          style="left: {{x}}px; top: {{y}}px; --onlybattle-token-scale: {{scale}}; --onlybattle-token-size-scale: {{sizeScale}};"
+          style="left: {{anchor.x}}px; top: {{anchor.y}}px; --onlybattle-token-scale: {{scale}}; --onlybattle-token-size-scale: {{sizeScale}}; --onlybattle-token-art-height: {{tokenArtHeight}}px; --onlybattle-token-label-top: {{labelTop}}px;"
           data-token-id="{{id}}"
         >
           {{#if isVideo}}
@@ -118,10 +141,10 @@
       <div class="onlybattle-hit-flash"></div>
     </div>
 
-    {{#if scene.portraits.allies}}
-      <aside class="onlybattle-combat-portrait-stack onlybattle-combat-portrait-stack-ally">
-        {{#each scene.portraits.allies}}
-          <div class="onlybattle-combat-portrait onlybattle-combat-portrait-ally {{#if bloodied}}onlybattle-combat-portrait-bloodied{{/if}}">
+    {{#if scene.portraits.targets}}
+      <aside class="onlybattle-combat-portrait-stack onlybattle-combat-portrait-stack-target">
+        {{#each scene.portraits.targets}}
+          <div class="onlybattle-combat-portrait onlybattle-combat-portrait-target {{#if bloodied}}onlybattle-combat-portrait-bloodied{{/if}} {{#if unconscious}}onlybattle-combat-portrait-unconscious{{/if}}">
             {{#if isVideo}}
               <video src="{{img}}" aria-label="{{name}}" autoplay loop muted playsinline></video>
             {{else}}
@@ -133,6 +156,7 @@
                 {{#if distance.value}}<span>{{distance.value}} {{distance.units}}</span>{{/if}}
                 {{#if damageText}}<span class="onlybattle-damage-chip">{{damageText}}</span>{{/if}}
                 {{#if hpText}}<span class="onlybattle-hp-chip">{{hpText}}</span>{{/if}}
+                {{#if unconscious}}<b>{{localize "ONLYBATTLE.Overlay.UnconsciousBang"}}</b>{{/if}}
                 {{#if bloodied}}<b>{{localize "ONLYBATTLE.Overlay.BloodiedBang"}}</b>{{/if}}
               </div>
             </div>
@@ -142,25 +166,27 @@
     {{/if}}
   </div>
 
-  {{#if cutins.allies}}
-    <div class="onlybattle-event-cutin onlybattle-event-cutin-ally">
-      {{#each cutins.allies}}
-        <div class="onlybattle-event-cutin-card onlybattle-combat-portrait-ally {{#if bloodied}}onlybattle-combat-portrait-bloodied{{/if}}">
-          {{#if isVideo}}
-            <video src="{{img}}" aria-label="{{name}}" autoplay loop muted playsinline></video>
-          {{else}}
-            <img src="{{img}}" alt="{{name}}" />
-          {{/if}}
-          <div class="onlybattle-event-cutin-text">
-            <b>{{localize label}}</b>
-            <strong>{{name}}</strong>
-            <div class="onlybattle-portrait-stats">
-              {{#if damageText}}<span class="onlybattle-damage-chip">{{damageText}}</span>{{/if}}
-              {{#if hpText}}<span class="onlybattle-hp-chip">{{hpText}}</span>{{/if}}
+  {{#unless cinematicCutin}}
+    {{#if cutins.allies}}
+      <div class="onlybattle-event-cutin onlybattle-event-cutin-ally">
+        {{#each cutins.allies}}
+          <div class="onlybattle-event-cutin-card onlybattle-combat-portrait-ally {{#if bloodied}}onlybattle-combat-portrait-bloodied{{/if}} {{#if unconscious}}onlybattle-combat-portrait-unconscious{{/if}}">
+            {{#if isVideo}}
+              <video src="{{img}}" aria-label="{{name}}" autoplay loop muted playsinline></video>
+            {{else}}
+              <img src="{{img}}" alt="{{name}}" />
+            {{/if}}
+            <div class="onlybattle-event-cutin-text">
+              <b>{{localize label}}</b>
+              <strong>{{name}}</strong>
+              <div class="onlybattle-portrait-stats">
+                {{#if damageText}}<span class="onlybattle-damage-chip">{{damageText}}</span>{{/if}}
+                {{#if hpText}}<span class="onlybattle-hp-chip">{{hpText}}</span>{{/if}}
+              </div>
             </div>
           </div>
-        </div>
-      {{/each}}
-    </div>
-  {{/if}}
+        {{/each}}
+      </div>
+    {{/if}}
+  {{/unless}}
 </section>
